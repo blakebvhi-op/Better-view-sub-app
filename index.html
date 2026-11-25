@@ -32,6 +32,27 @@ button.card{display:block;width:100%;text-align:left;cursor:pointer}
 .row{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
 .title{font-weight:650;font-size:16px}
 .mut{color:var(--mut);font-size:14px}
+.doc{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}
+.dochead{display:flex;justify-content:space-between;gap:14px;margin-bottom:14px}
+.doctitle{font-size:20px;font-weight:700}
+.docmeta{text-align:right;font-size:14px;min-width:38%}
+.docmeta b{display:block;font-size:13px;letter-spacing:.1em}
+.docmeta span,.lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--mut);text-transform:uppercase;margin-top:8px}
+table.lines thead th{background:#333;color:#fff;padding:9px 10px;font-size:11px;border:0}
+table.lines td{padding:10px;border-bottom:1px dashed #c9ced6}
+table.lines tbody tr:nth-child(even){background:#ececec}
+.det{white-space:pre-wrap;color:#444;font-size:14px}
+.totals{margin-left:auto;max-width:300px;margin-top:12px}
+.totals div{display:flex;justify-content:space-between;padding:8px 10px;font-size:14px}
+.totals .due{background:#f1f1f1;font-weight:700;font-size:16px}
+.li{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:10px;background:#fafbfc}
+.two input{flex:1;min-width:0}
+.check{display:flex;gap:10px;align-items:flex-start;font-weight:400}.check input{width:auto;margin-top:3px}
+.ccard{border-left:5px solid var(--navy)}
+.cstats{display:flex;gap:8px;margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+.cstats div{flex:1}.cstats b{display:block;font-size:17px}.cstats span{font-size:12px;color:var(--mut)}
+.bigcheck{width:64px;height:64px;border-radius:50%;background:#dcfce7;color:#15803d;font-size:36px;line-height:64px;margin:6px auto 12px}
+@media print{header,nav,.demo,.noprint{display:none!important}body{background:#fff}main{padding:0}.doc{border:0;padding:0}table.lines thead th{-webkit-print-color-adjust:exact;print-color-adjust:exact}table.lines tbody tr{-webkit-print-color-adjust:exact;print-color-adjust:exact;break-inside:avoid}}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
 .cal .dow{text-align:center;font-size:11px;color:var(--mut);padding-bottom:2px}
 .cd{aspect-ratio:1;border:1px solid var(--line);background:#fff;border-radius:8px;position:relative;cursor:pointer;font-size:14px;padding:0 0 8px}
@@ -98,12 +119,13 @@ const BILLING_ROLES = ['owner', 'manager'];
 const ROLE_LABEL = { owner: 'Owner', manager: 'Manager', project_manager: 'Project manager', laborer: 'Crew' };
 const SESSION_KEY = 'subapp_session_v1';
 const PENDING_KEY = 'subapp_pending_v2';
-const CONTRACTOR_COLS = 'id,company_id,name,contact_name,phone,email,notes,link_status,link_code,link_code_expires,linked_name,linked_at';
+const CONTRACTOR_COLS = 'id,company_id,name,contact_name,phone,email,address,notes,link_status,link_code,link_code_expires,linked_name,linked_at';
 const DEMO = !SB_URL || !SB_KEY || /[?&]demo=1\b/.test(location.search);
 const SITE_URL = location.origin + location.pathname;
 
 const NOW = new Date();
-const S = { view: 'loading', authMode: 'signin', tab: 'orders', filter: 'open', search: '', detailId: null, edit: null,
+const S = { view: 'loading', authMode: 'signin', tab: 'contractors', stack: [], draft: null, cview: 'jobs', saved: [],
+  filter: 'open', search: '', detailId: null, edit: null,
   cal: { y: NOW.getFullYear(), m: NOW.getMonth() }, calDay: null,
   session: null, profile: null, company: null, orders: [], pays: [], contractors: [], team: [], invites: [],
   msg: null, busy: false, form: null };
@@ -128,16 +150,34 @@ function fmtDate(d) {
   return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }));
-// line items are typed one per line: "24 sq Tear-off" or just "Haul away debris"
-function parseItems(text) {
-  return String(text || '').split('\n').map(l => l.trim()).filter(Boolean).map(l => {
-    const m = /^(\d+(?:\.\d+)?)\s+(\S+)\s+(.+)$/.exec(l);
-    return m ? { desc: m[3], qty: Number(m[1]), unit: m[2] } : { desc: l, qty: null, unit: '' };
-  });
+// ---- line items and money. All money math is integer cents; quantities are integer thousandths. ----
+function parseQty(str) {                 // up to 3 decimals; returns thousandths or null
+  const t = String(str == null ? '' : str).replace(/[,\s]/g, '');
+  if (!/^\d+(\.\d{1,3})?$/.test(t)) return null;
+  const [d, f = ''] = t.split('.');
+  return parseInt(d, 10) * 1000 + parseInt((f + '000').slice(0, 3), 10);
 }
-const itemsText = arr => (Array.isArray(arr) ? arr : []).map(i => (i.qty != null && i.qty !== '' ? i.qty + ' ' + (i.unit || 'ea') + ' ' : '') + (i.desc || '')).join('\n');
+const lineCents = l => { const r = parseMoney(l.rate, true), q = parseQty(l.qty); return r == null || q == null ? 0 : Math.floor((r * q + 500) / 1000); };
+const linesTotal = lines => (lines || []).reduce((t, l) => t + (String(l.desc || '').trim() ? lineCents(l) : 0), 0);
+const qtyText = l => (l.qty == null || l.qty === '' ? '' : String(l.qty)) + (l.unit ? ' ' + l.unit : '');
+const blankLine = () => ({ desc: '', detail: '', qty: '', unit: '', rate: '' });
+const cleanLines = (lines, withRate) => (lines || []).filter(l => String(l.desc || '').trim()).map(l => {
+  const o = { desc: String(l.desc).trim(), detail: String(l.detail || '').trim(), unit: String(l.unit || '').trim(), qty: parseQty(l.qty) == null ? (withRate ? '0' : null) : String(l.qty).replace(/[,\s]/g, '') };
+  if (!withRate && o.qty != null) o.qty = Number(o.qty);
+  if (withRate) o.rate = parseMoney(l.rate, true) == null ? '0' : (parseMoney(l.rate, true) / 100).toFixed(2);
+  return o;
+});
+// price list for a contractor: their own items first, then items saved for everyone
+const priceList = cid => S.saved.filter(i => i.contractor_id === cid).concat(S.saved.filter(i => !i.contractor_id));
+const priceFor = (cid, title) => { const t = String(title || '').trim().toLowerCase(); return t ? priceList(cid).find(i => i.title.trim().toLowerCase() === t) || null : null; };
+function nextInvoiceNumber() {           // last number used, plus one
+  const nums = S.pays.map(p => p.invoice_number).filter(Boolean);
+  if (!nums.length) return 'INV-1001';
+  const last = nums.sort((a, b) => String(a).localeCompare(String(b), 'en', { numeric: true })).pop(), m = /^(.*?)(\d+)$/.exec(last);
+  return m ? m[1] + String(parseInt(m[2], 10) + 1).padStart(m[2].length, '0') : last + '-2';
+}
 const ORDER_LABEL = { sent: 'Needs response', accepted: 'Scheduled', declined: 'Declined', complete: 'Complete', cancelled: 'Cancelled' };
-const PAY_LABEL = { submitted: 'Awaiting approval', approved: 'Approved', paid: 'Paid', rejected: 'Rejected' };
+const PAY_LABEL = { submitted: 'Sent', approved: 'Approved', paid: 'Paid', rejected: 'Rejected' };
 const LINK_LABEL = { manual: 'Not linked', pending: 'Code waiting', active: 'Linked', revoked: 'Unlinked' };
 const ERR = {
   not_authenticated: 'Your session expired. Sign in again.',
@@ -158,9 +198,9 @@ const ERR = {
   not_found_or_already_answered: 'This work order was already answered or is no longer available.',
   photo_required: 'Add at least one completion photo.',
   not_found_or_not_accepted: 'This work order must be accepted before it can be completed.',
-  amount_required: 'Enter an amount greater than zero.',
+  amount_required: 'The invoice total must be more than zero. Add a rate and quantity to at least one line.',
   work_order_not_complete: 'Mark the work order complete before billing.',
-  already_submitted: 'A pay request was already submitted for this work order.',
+  already_submitted: 'An invoice was already sent for this work order.',
   not_found_or_linked: 'Payment status on a linked work order is set by the contractor.',
   '42501': 'Permission denied. Sign out and back in, then try again.',
   PGRST202: 'The database is not set up yet. Run the latest setup SQL, then try again.',
@@ -235,15 +275,16 @@ const live = {
     const team = sb.req('/rest/v1/profiles?select=id,role,display_name,email&order=display_name');
     if (!isMgmt()) {                    // crew: accepted and completed jobs only, no pay
       const [r, t] = await Promise.all([sb.rpc('crew_work_orders'), team]);
-      S.orders = r.work_orders || []; S.pays = []; S.contractors = []; S.invites = []; S.team = t || []; return;
+      S.orders = r.work_orders || []; S.pays = []; S.contractors = []; S.invites = []; S.saved = []; S.team = t || []; return;
     }
     const [o, p, c, t, i] = await Promise.all([
       sb.req('/rest/v1/work_orders?select=*'),
       sb.req('/rest/v1/pay_requests?select=*'),
       sb.req('/rest/v1/contractors?select=' + CONTRACTOR_COLS + '&order=name'),
       team,
-      canBill() ? sb.req('/rest/v1/team_invites?select=id,role,code,expires_at&used_at=is.null&order=created_at.desc') : []
-    ]);
+      canBill() ? sb.req('/rest/v1/team_invites?select=id,role,code,expires_at&used_at=is.null&order=created_at.desc') : [],
+      sb.req('/rest/v1/saved_items?select=*&order=title')
+    ]).then(a => { S.saved = a[5] || []; return a; });
     S.orders = o || []; S.pays = p || []; S.contractors = c || []; S.team = t || [];
     S.invites = (i || []).filter(x => new Date(x.expires_at) > new Date());
   },
@@ -253,8 +294,10 @@ const live = {
   cancelInvite: id => sb.rpc('team_cancel_invite', { p_id: id }),
   setRole: (uid, r) => sb.rpc('team_set_role', { p_user_id: uid, p_role: r }),
   removeMember: uid => sb.rpc('team_remove_member', { p_user_id: uid }),
-  updateAccount: (company, display) => sb.rpc('account_update', { p_company_name: company || null, p_display_name: display }),
-  saveContractor: (id, f) => sb.rpc('contractor_save', { p_id: id || null, p_name: f.name, p_contact_name: f.contact_name, p_phone: f.phone, p_email: f.email, p_notes: f.notes }),
+  updateAccount: f => sb.rpc('account_update', { p_company_name: f.company || null, p_display_name: f.display, p_phone: f.phone || null, p_email: f.email || null, p_address: f.address || null }),
+  saveItem: (id, f) => sb.rpc('saved_item_save', { p_id: id || null, p_contractor_id: f.contractor_id || null, p_title: f.title, p_detail: f.detail, p_unit: f.unit, p_rate: f.rateCents / 100 }),
+  deleteItem: id => sb.rpc('saved_item_delete', { p_id: id }),
+  saveContractor: (id, f) => sb.rpc('contractor_save', { p_id: id || null, p_name: f.name, p_contact_name: f.contact_name, p_phone: f.phone, p_email: f.email, p_address: f.address, p_notes: f.notes }),
   createLinkCode: id => sb.rpc('contractor_create_link_code', { p_id: id }),
   revokeLink: id => sb.rpc('contractor_revoke_link', { p_id: id }),
   saveOrder: (id, f) => sb.rpc('wo_save_manual', { p_id: id || null, p_contractor_id: f.contractor_id || null, p_title: f.title, p_address: f.address, p_scope: f.scope, p_line_items: f.line_items, p_pay_amount: f.payCents / 100, p_scheduled_date: f.scheduled_date || null }),
@@ -270,7 +313,7 @@ const live = {
     }
     return sb.rpc('wo_complete', { p_id: id, p_photos: photos, p_notes: notes || null });
   },
-  submitPay: (id, amountCents, notes) => sb.rpc('pay_submit', { p_work_order_id: id, p_amount: amountCents / 100, p_notes: notes || null }),
+  submitInvoice: (id, d) => sb.rpc('pay_submit', { p_work_order_id: id, p_lines: cleanLines(d.lines, true), p_invoice_number: d.number, p_invoice_date: d.date || null, p_due_terms: d.due, p_po: d.po, p_notes: d.notes || null }),
   markPay: (id, status) => sb.rpc('pay_mark_manual', { p_work_order_id: id, p_status: status }),
   signOut() { saveSession(null); }
 };
@@ -292,16 +335,22 @@ function toJpeg(file) {                  // downscale to max 1600px, JPEG
 const swatch = (label, color) => 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><rect width="300" height="300" fill="' + color + '"/><text x="150" y="158" font-family="sans-serif" font-size="22" fill="#fff" text-anchor="middle">' + label + '</text></svg>');
 const demoDb = {
   contractors: [
-    { id: 'c-1', name: 'Demo General Contracting', contact_name: 'Sample Contact', phone: '', email: '', notes: '', link_status: 'active', linked_name: 'Demo General Contracting' },
-    { id: 'c-2', name: 'Example Builders', contact_name: '', phone: '', email: '', notes: 'Pays net 15.', link_status: 'manual' }
+    { id: 'c-1', name: 'Demo General Contracting', contact_name: 'Sample Contact', phone: '555-0100', email: 'office@example.com', address: '100 Sample Pkwy, Anytown, WI', notes: '', link_status: 'active', linked_name: 'Demo General Contracting' },
+    { id: 'c-2', name: 'Example Builders', contact_name: 'Pat Example', phone: '555-0101', email: 'pat@example.com', address: '', notes: 'Pays net 15.', link_status: 'manual' }
   ],
   orders: [
-    { id: 'wo-1', contractor_id: 'c-1', source: 'link', title: 'Tear-off and re-roof, 24 sq', address: '123 Sample St, Anytown, WI', scope: 'Full tear-off to deck. Install ice and water at eaves and valleys, synthetic underlayment, architectural shingles, new pipe boots and ridge vent. Haul away debris.', line_items: [{ desc: 'Tear-off, 1 layer', qty: 24, unit: 'sq' }, { desc: 'Architectural shingles', qty: 24, unit: 'sq' }, { desc: 'Ridge vent', qty: 42, unit: 'lf' }], photos: [{ url: swatch('Front elevation', '#64748b'), caption: 'Front' }, { url: swatch('Rear slope', '#475569'), caption: 'Rear' }], pay_amount: 6480, scheduled_date: day(3), status: 'sent' },
-    { id: 'wo-2', contractor_id: 'c-2', source: 'manual', title: 'Gutter install, 5" K-style', address: '456 Example Ave, Anytown, WI', scope: 'Remove existing gutters. Install 5" seamless aluminum with 2x3 downspouts, 4 drops.', line_items: [{ desc: '5" seamless gutter', qty: 148, unit: 'lf' }, { desc: '2x3 downspout', qty: 4, unit: 'ea' }], photos: [], pay_amount: 1110, scheduled_date: day(6), status: 'accepted' },
+    { id: 'wo-1', contractor_id: 'c-1', source: 'link', title: 'Tear-off and re-roof, 24 sq', address: '123 Sample St, Anytown, WI', scope: 'Full tear-off to deck. Install ice and water at eaves and valleys, synthetic underlayment, architectural shingles, new pipe boots and ridge vent. Haul away debris.', line_items: [{ desc: 'Tear off', detail: '1 layer asphalt', qty: 24, unit: 'sq' }, { desc: 'Architectural shingles', detail: '', qty: 24, unit: 'sq' }, { desc: 'Flashing', detail: 'Chimney\nTwo skylights', qty: 3, unit: 'ea' }, { desc: 'Ridge vent', detail: '', qty: 42, unit: 'lf' }], photos: [{ url: swatch('Front elevation', '#64748b'), caption: 'Front' }, { url: swatch('Rear slope', '#475569'), caption: 'Rear' }], pay_amount: 6480, scheduled_date: day(3), status: 'sent' },
+    { id: 'wo-2', contractor_id: 'c-2', source: 'manual', title: 'Gutter install, 5" K-style', address: '456 Example Ave, Anytown, WI', scope: 'Remove existing gutters. Install 5" seamless aluminum with 2x3 downspouts, 4 drops.', line_items: [{ desc: 'Gutters and downspouts', detail: "148' gutters\n40' downs", qty: 188, unit: 'lf' }, { desc: 'Material pick up', detail: '', qty: 1, unit: 'ea' }], photos: [], pay_amount: 1485, scheduled_date: day(6), status: 'accepted' },
     { id: 'wo-3', contractor_id: 'c-1', source: 'link', title: 'Siding repair, north wall', address: '789 Placeholder Rd, Anytown, WI', scope: 'Replace 2 sq of damaged vinyl siding, match existing profile. Re-flash window head.', line_items: [{ desc: 'Vinyl siding D4', qty: 2, unit: 'sq' }], photos: [], pay_amount: 950, scheduled_date: day(-4), status: 'complete', completion_photos: [{ url: swatch('Completed', '#15803d'), caption: '' }], completion_notes: 'Done. Color match is close.' },
     { id: 'wo-4', contractor_id: 'c-2', source: 'manual', title: 'Soffit and fascia wrap', address: '12 Test Ct, Anytown, WI', scope: 'Wrap fascia in aluminum coil, install vented soffit on front elevation.', line_items: [{ desc: 'Vented soffit', qty: 60, unit: 'lf' }], photos: [], pay_amount: 1375.5, scheduled_date: day(-12), status: 'complete', completion_photos: [{ url: swatch('Completed', '#15803d'), caption: '' }] }
   ],
-  pays: [{ id: 'pr-1', work_order_id: 'wo-4', amount: 1375.5, notes: '', status: 'submitted' }],
+  pays: [{ id: 'pr-1', work_order_id: 'wo-4', amount: 1375.5, notes: '', status: 'submitted', invoice_number: 'INV-1001', invoice_date: day(-10), due_terms: 'On receipt', po: '12 Test Ct, Anytown, WI', line_items: [{ desc: 'Vented soffit', detail: 'Front elevation', qty: '60', unit: 'lf', rate: '3.00' }, { desc: 'Fascia wrap', detail: '', qty: '239', unit: 'lf', rate: '5.00' }, { desc: 'Material pick up', detail: '', qty: '1', unit: 'ea', rate: '0.50' }] }],
+  saved: [
+    { id: 's-1', contractor_id: 'c-2', title: 'Gutters and downspouts', detail: '', unit: 'lf', rate: 7.5 },
+    { id: 's-2', contractor_id: 'c-2', title: 'Vented soffit', detail: '', unit: 'lf', rate: 3 },
+    { id: 's-3', contractor_id: null, title: 'Material pick up', detail: '', unit: 'ea', rate: 75 },
+    { id: 's-4', contractor_id: 'c-1', title: 'Vinyl siding', detail: '', unit: 'sq', rate: 150 }
+  ],
   team: [{ id: 'demo', role: 'owner', display_name: 'Demo User', email: 'you@example.com' }, { id: 'm-2', role: 'laborer', display_name: 'Sample Crew', email: 'crew@example.com' }],
   invites: [],
   user: null
@@ -313,12 +362,12 @@ const demo = {
   async signUp() { await wait(); S.session = { user: { id: 'demo', email: 'you@example.com' } }; demoDb.user = null; return true; },
   async recover() { await wait(); },
   async setPassword() { await wait(); },
-  async loadProfile() { S.profile = demoDb.user ? { id: 'demo', company_id: 'demo-co', role: demoDb.user.role, display_name: demoDb.user.name } : null; S.company = demoDb.user ? { id: 'demo-co', name: demoDb.user.company } : null; },
+  async loadProfile() { S.profile = demoDb.user ? { id: 'demo', company_id: 'demo-co', role: demoDb.user.role, display_name: demoDb.user.name } : null; S.company = demoDb.user ? { id: 'demo-co', name: demoDb.user.company, phone: demoDb.user.phone || '555-0199', email: demoDb.user.email || 'you@example.com', address: demoDb.user.address || '' } : null; },
   async loadData() {
     await wait(); const me = demoDb.team.find(t => t.id === 'demo'); me.role = demoDb.user.role; me.display_name = demoDb.user.name;
     S.team = demoDb.team.map(t => ({ ...t })); S.invites = demoDb.invites.map(i => ({ ...i }));
-    if (!isMgmt()) { S.orders = demoDb.orders.filter(o => o.status === 'accepted' || o.status === 'complete').map(o => { const c = { ...o, contractor_name: (demoDb.contractors.find(x => x.id === o.contractor_id) || {}).name }; delete c.pay_amount; return c; }); S.pays = []; S.contractors = []; S.invites = []; return; }
-    S.orders = demoDb.orders.map(o => ({ ...o })); S.pays = demoDb.pays.map(p => ({ ...p })); S.contractors = demoDb.contractors.map(c => ({ ...c })).sort((a, b) => a.name.localeCompare(b.name));
+    if (!isMgmt()) { S.orders = demoDb.orders.filter(o => o.status === 'accepted' || o.status === 'complete').map(o => { const c = { ...o, contractor_name: (demoDb.contractors.find(x => x.id === o.contractor_id) || {}).name }; delete c.pay_amount; return c; }); S.pays = []; S.contractors = []; S.invites = []; S.saved = []; return; }
+    S.orders = demoDb.orders.map(o => ({ ...o })); S.pays = demoDb.pays.map(p => ({ ...p })); S.contractors = demoDb.contractors.map(c => ({ ...c })).sort((a, b) => a.name.localeCompare(b.name)); S.saved = demoDb.saved.map(i => ({ ...i })).sort((a, b) => a.title.localeCompare(b.title));
   },
   async createCompany(name, display) { if (!name) throw appErr('company_name_required'); demoDb.user = { company: name, name: display, role: 'owner' }; },
   async joinTeam(code, display) { await wait(); if (!code) throw appErr('invalid_team_code'); demoDb.user = { company: 'Demo Subcontracting LLC', name: display || 'Crew Member', role: 'laborer' }; },
@@ -326,7 +375,9 @@ const demo = {
   async cancelInvite(id) { await wait(); demoDb.invites = demoDb.invites.filter(i => i.id !== id); },
   async setRole(uid, r) { await wait(); const t = demoDb.team.find(x => x.id === uid); if (!t || t.role === 'owner') throw appErr('not_found'); t.role = r; },
   async removeMember(uid) { await wait(); if (uid === 'demo') throw appErr('cannot_change_self'); demoDb.team = demoDb.team.filter(x => x.id !== uid); },
-  async updateAccount(company, display) { await wait(); if (!display) throw appErr('display_name_required'); demoDb.user.name = display; if (demoDb.user.role === 'owner') { if (!company) throw appErr('company_name_required'); demoDb.user.company = company; } },
+  async updateAccount(f) { await wait(); if (!f.display) throw appErr('display_name_required'); demoDb.user.name = f.display; if (demoDb.user.role === 'owner') { if (!f.company) throw appErr('company_name_required'); Object.assign(demoDb.user, { company: f.company, phone: f.phone, email: f.email, address: f.address }); } },
+  async saveItem(id, f) { await wait(); if (!f.title) throw appErr('title_required'); const row = { contractor_id: f.contractor_id || null, title: f.title, detail: f.detail, unit: f.unit, rate: f.rateCents / 100 }; const cur = demoDb.saved.find(x => x.id === id); if (cur) Object.assign(cur, row); else demoDb.saved.push(Object.assign({ id: uuid() }, row)); },
+  async deleteItem(id) { await wait(); demoDb.saved = demoDb.saved.filter(x => x.id !== id); },
   async saveContractor(id, f) { await wait(); if (!f.name) throw appErr('name_required'); const c = demoDb.contractors.find(x => x.id === id); if (c) Object.assign(c, f); else demoDb.contractors.push(Object.assign({ id: uuid(), link_status: 'manual' }, f)); },
   async createLinkCode(id) { await wait(); const c = demoDb.contractors.find(x => x.id === id); if (!c) throw appErr('not_found'); if (c.link_status === 'active') throw appErr('already_linked'); c.link_status = 'pending'; c.link_code = uuid().replace(/-/g, '').slice(0, 10).toUpperCase(); c.link_code_expires = day(7); },
   async revokeLink(id) { await wait(); const c = demoDb.contractors.find(x => x.id === id); if (!c || !['pending', 'active'].includes(c.link_status)) throw appErr('not_found'); c.link_status = 'revoked'; c.link_code = null; },
@@ -334,7 +385,7 @@ const demo = {
   async cancelOrder(id) { await wait(); const o = dOrder(id); if (!o || o.source !== 'manual' || o.status !== 'accepted') throw appErr('not_found_or_locked'); o.status = 'cancelled'; },
   async respond(id, accept, reason) { await wait(); const o = dOrder(id); if (!o || o.status !== 'sent') throw appErr('not_found_or_already_answered'); o.status = accept ? 'accepted' : 'declined'; if (!accept) o.decline_reason = reason; },
   async complete(id, files, notes) { await wait(); if (!files.length) throw appErr('photo_required'); const o = dOrder(id); if (!o || o.status !== 'accepted') throw appErr('not_found_or_not_accepted'); o.status = 'complete'; o.completion_photos = files.map(f => ({ url: URL.createObjectURL(f), caption: '' })); o.completion_notes = notes; },
-  async submitPay(id, amountCents, notes) { await wait(); if (!(amountCents > 0)) throw appErr('amount_required'); const o = dOrder(id); if (!o || o.status !== 'complete') throw appErr('work_order_not_complete'); const cur = demoDb.pays.find(p => p.work_order_id === id); if (cur && cur.status !== 'rejected') throw appErr('already_submitted'); if (cur) Object.assign(cur, { amount: amountCents / 100, notes, status: 'submitted' }); else demoDb.pays.push({ id: uuid(), work_order_id: id, amount: amountCents / 100, notes, status: 'submitted' }); },
+  async submitInvoice(id, d) { await wait(); const lines = cleanLines(d.lines, true), total = linesTotal(lines); if (!(total > 0)) throw appErr('amount_required'); const o = dOrder(id); if (!o || o.status !== 'complete') throw appErr('work_order_not_complete'); const cur = demoDb.pays.find(p => p.work_order_id === id); if (cur && !(cur.status === 'rejected' || (cur.status === 'submitted' && o.source === 'manual'))) throw appErr('already_submitted'); const row = { amount: total / 100, notes: d.notes, status: 'submitted', invoice_number: d.number, invoice_date: d.date || day(0), due_terms: d.due, po: d.po, line_items: lines }; if (cur) Object.assign(cur, row); else demoDb.pays.push(Object.assign({ id: uuid(), work_order_id: id }, row)); },
   async markPay(id, status) { await wait(); const o = dOrder(id), p = demoDb.pays.find(x => x.work_order_id === id); if (!o || !p || o.source !== 'manual' || !['submitted', 'approved'].includes(p.status)) throw appErr('not_found_or_linked'); p.status = status; },
   signOut() { S.session = null; }
 };
@@ -349,29 +400,34 @@ const contractor = id => S.contractors.find(c => c.id === id) || null;
 const gcName = o => { const c = contractor(o.contractor_id); return c ? c.name : (o.contractor_name || ''); };
 const byDate = (a, b) => String(a.scheduled_date || '9999').localeCompare(String(b.scheduled_date || '9999'));
 const TABS = () => isMgmt()
-  ? [['orders', '▤', 'Work orders'], ['schedule', '◷', 'Schedule'], ['billing', '$', 'Billing'], ['contractors', '⚑', 'Contractors'], ['account', '☰', 'Account']]
+  ? [['contractors', '⚑', 'Contractors'], ['orders', '▤', 'Work orders'], ['schedule', '◷', 'Schedule'], ['billing', '$', 'Invoices'], ['account', '☰', 'Account']]
   : [['orders', '▤', 'Jobs'], ['schedule', '◷', 'Schedule'], ['account', '☰', 'Account']];
 
 /* ---------- views ---------- */
-const msgHtml = () => S.msg ? '<div class="msg ' + S.msg.kind + '" role="status">' + esc(S.msg.text) + '</div>' : '';
+const msgHtml = () => S.msg ? '<div class="msg ' + S.msg.kind + ' noprint" role="status">' + esc(S.msg.text) + '</div>' : '';
 const demoBar = () => DEMO ? '<div class="demo">DEMO MODE — sample data, nothing is saved</div>' : '';
 const dis = () => S.busy ? ' disabled' : '';
 const field = (id, name, label, val, extra) => '<label for="' + id + '">' + label + '</label><input id="' + id + '" name="' + name + '" value="' + esc(val) + '" ' + (extra || '') + '>';
+const dfield = (id, key, label, extra) => '<label for="' + id + '">' + label + '</label><input id="' + id + '" data-d="' + key + '" value="' + esc(S.draft[key]) + '" ' + (extra || '') + '>';
 const roleOptions = (sel, list) => list.map(r => '<option value="' + r + '"' + (sel === r ? ' selected' : '') + '>' + ROLE_LABEL[r] + '</option>').join('');
+const pill = (cls, text) => '<span class="pill ' + cls + '">' + esc(text) + '</span>';
 
 function viewAuth() {
   const m = S.authMode, d = DEMO;
   const email = field('em', 'email', 'Email', d ? 'you@example.com' : '', 'type="email" autocomplete="email" required');
   const pw = n => field('pw', 'password', n ? 'New password' : 'Password', d ? 'demo-only' : '', 'type="password" required minlength="6" autocomplete="' + (m === 'signin' ? 'current-password' : 'new-password') + '"');
-  let form, links;
-  if (m === 'signup') { form = '<form data-form="signup" class="card">' + email + pw() + field('cn', 'company', 'Company name', '', 'required') + field('dn', 'display', 'Your name', '', 'required') + '<button class="btn"' + dis() + '>Create company account</button></form>'; }
+  const link = (mode, t) => '<button class="link" data-act="authmode" data-id="' + mode + '">' + t + '</button>';
+  let form, links = link('signin', 'Back to sign in');
+  if (m === 'confirmed') {               // landing page for the "confirm your email" link
+    form = '<div class="card" style="text-align:center"><div class="bigcheck" aria-hidden="true">✓</div><div class="title" style="font-size:20px">Email confirmed</div><p class="mut">' + esc(S.session && S.session.user.email) + ' is confirmed and you are signed in.</p><button class="btn" data-act="confirmcontinue"' + dis() + '>Continue</button></div>'; links = '';
+  } else if (m === 'checkemail') {
+    form = '<div class="card" style="text-align:center"><div class="title" style="font-size:20px">Check your email</div><p class="mut">We sent a confirmation link to ' + esc(S.form && S.form.email) + '. Tap it to confirm your email and finish setup.</p><p class="mut">Open the link on this same phone or computer. Nothing there? Check spam.</p></div>';
+  } else if (m === 'signup') { form = '<form data-form="signup" class="card">' + email + pw() + field('cn', 'company', 'Company name', '', 'required') + field('dn', 'display', 'Your name', '', 'required') + '<button class="btn"' + dis() + '>Create company account</button></form>'; }
   else if (m === 'join') { form = '<form data-form="joinsignup" class="card"><p class="mut" style="margin:0">Your owner or manager gives you a join code from their Account screen.</p>' + field('jc', 'code', 'Join code', '', 'required autocapitalize="characters" autocomplete="off"') + field('dn', 'display', 'Your name', '', 'required') + email + pw() + '<button class="btn"' + dis() + '>Join my company</button></form>'; }
   else if (m === 'forgot') { form = '<form data-form="forgot" class="card"><p class="mut" style="margin:0">We will email you a link to set a new password.</p>' + email + '<button class="btn"' + dis() + '>Send reset link</button></form>'; }
-  else if (m === 'newpw') { form = '<form data-form="newpw" class="card"><p class="mut" style="margin:0">Choose a new password for ' + esc(S.session && S.session.user.email) + '.</p>' + pw(true) + '<button class="btn"' + dis() + '>Save password</button></form>'; }
-  else { form = '<form data-form="signin" class="card">' + email + pw() + '<button class="btn"' + dis() + '>Sign in</button></form>'; }
-  const link = (mode, t) => '<button class="link" data-act="authmode" data-id="' + mode + '">' + t + '</button>';
-  links = m === 'signin' ? link('signup', 'Start a new company account') + '<br>' + link('join', 'Join your company with a code') + '<br>' + link('forgot', 'Forgot password?') : m === 'newpw' ? '' : link('signin', 'Back to sign in');
-  return demoBar() + '<main><div class="auth"><h1>' + esc(APP_NAME) + '</h1><p class="mut">Work orders, scheduling and billing for subcontractors.</p>' + msgHtml() + form + links + '</div></main>';
+  else if (m === 'newpw') { form = '<form data-form="newpw" class="card"><p class="mut" style="margin:0">Choose a new password for ' + esc(S.session && S.session.user.email) + '.</p>' + pw(true) + '<button class="btn"' + dis() + '>Save password</button></form>'; links = ''; }
+  else { form = '<form data-form="signin" class="card">' + email + pw() + '<button class="btn"' + dis() + '>Sign in</button></form>'; links = link('signup', 'Start a new company account') + '<br>' + link('join', 'Join your company with a code') + '<br>' + link('forgot', 'Forgot password?'); }
+  return demoBar() + '<main><div class="auth"><h1>' + esc(APP_NAME) + '</h1><p class="mut">Work orders, scheduling and invoices for subcontractors.</p>' + msgHtml() + form + links + '</div></main>';
 }
 function viewOnboard() {
   const p = S.form || {};
@@ -380,16 +436,71 @@ function viewOnboard() {
     '<form data-form="join" class="card"><div class="title">Or join your company</div>' + field('jc', 'code', 'Join code', p.code, 'required autocapitalize="characters" autocomplete="off"') + field('dn2', 'display', 'Your name', p.display, 'required') + '<button class="btn ghost"' + dis() + '>Join</button></form>' +
     '<button class="link" data-act="signout">Sign out</button></div></main>';
 }
+
+/* cards */
 function orderCard(o) {
   const pr = payFor(o.id);
   return '<button class="card" data-act="open" data-id="' + esc(o.id) + '"><div class="row"><div><div class="title">' + esc(o.title || 'Work order') + '</div><div class="mut">' + esc(o.address) + '</div><div class="mut">' + esc(fmtDate(o.scheduled_date)) + (gcName(o) ? ' · ' + esc(gcName(o)) : '') + '</div></div>' +
-    '<div style="text-align:right"><span class="pill s-' + esc(o.status) + '">' + esc(ORDER_LABEL[o.status] || o.status) + '</span>' + (pr ? '<div style="margin-top:6px"><span class="pill s-' + esc(pr.status) + '">' + esc(PAY_LABEL[pr.status] || pr.status) + '</span></div>' : '') + '</div></div></button>';
+    '<div style="text-align:right">' + pill('s-' + o.status, ORDER_LABEL[o.status] || o.status) + (pr ? '<div style="margin-top:6px">' + pill('s-' + pr.status, 'Invoice ' + (PAY_LABEL[pr.status] || pr.status).toLowerCase()) + '</div>' : '') + '</div></div></button>';
+}
+function invoiceCard(o) {
+  const pr = payFor(o.id);
+  return '<button class="card" data-act="openinvoice" data-id="' + esc(o.id) + '"><div class="row"><div><div class="title">' + esc(pr.invoice_number || 'Invoice') + '</div><div class="mut">' + esc(gcName(o)) + '</div><div class="mut">' + esc(o.title) + '</div></div>' +
+    '<div style="text-align:right"><div class="title">' + money(cents(pr.amount)) + '</div><div style="margin-top:6px">' + pill('s-' + pr.status, PAY_LABEL[pr.status] || pr.status) + '</div></div></div></button>';
+}
+function contractorCard(c) {
+  const mine = S.orders.filter(o => o.contractor_id === c.id), open = mine.filter(o => o.status === 'sent' || o.status === 'accepted').length;
+  const owed = mine.reduce((t, o) => { const p = payFor(o.id); return t + (p && (p.status === 'submitted' || p.status === 'approved') ? cents(p.amount) : 0); }, 0);
+  return '<button class="card ccard" data-act="opencontractor" data-id="' + esc(c.id) + '"><div class="row"><div><div class="title" style="font-size:18px">' + esc(c.name) + '</div><div class="mut">' + esc(c.contact_name || '') + '</div></div>' +
+    (c.link_status === 'active' ? pill('s-complete', 'Linked') : c.link_status === 'pending' ? pill('s-sent', 'Code waiting') : '') + '</div>' +
+    '<div class="cstats"><div><b>' + open + '</b><span>open job' + (open === 1 ? '' : 's') + '</span></div><div><b>' + mine.length + '</b><span>total</span></div><div><b>' + money(owed) + '</b><span>owed to you</span></div></div></button>';
+}
+
+/* documents: a work order is laid out like the invoice, minus the money columns */
+function linesTable(lines, priced) {
+  if (!lines.length) return '';
+  return '<table class="lines"><thead><tr><th>Description</th>' + (priced ? '<th class="n">Rate</th>' : '') + '<th class="n">Qty</th>' + (priced ? '<th class="n">Amount</th>' : '') + '</tr></thead><tbody>' +
+    lines.map(l => '<tr><td>' + (l.detail ? '<b>' + esc(l.desc) + '</b><div class="det">' + esc(l.detail) + '</div>' : esc(l.desc)) + '</td>' + (priced ? '<td class="n">' + money(parseMoney(l.rate, true) || 0) + '</td>' : '') + '<td class="n">' + esc(qtyText(l)) + '</td>' + (priced ? '<td class="n">' + money(lineCents(l)) + '</td>' : '') + '</tr>').join('') + '</tbody></table>';
+}
+function docHead(kind, metaRows) {
+  const c = S.company || {};
+  return '<div class="dochead"><div><div class="doctitle">' + esc(c.name || '') + '</div>' + [S.profile && S.profile.display_name, c.phone, c.email, c.address].filter(Boolean).map(v => '<div class="mut">' + esc(v) + '</div>').join('') + '</div>' +
+    '<div class="docmeta"><b>' + kind + '</b>' + metaRows.filter(r => r[1]).map(r => '<span>' + r[0] + '</span><div>' + r[1] + '</div>').join('') + '</div></div>';
+}
+function workOrderDoc(o) {
+  const items = Array.isArray(o.line_items) ? o.line_items : [], manual = o.source === 'manual';
+  const addr = o.address ? '<a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(o.address) + '" target="_blank" rel="noopener">' + esc(o.address) + '</a>' : '';
+  return '<div class="doc">' + docHead('WORK ORDER', [['Date', esc(fmtDate(o.scheduled_date))], ['Job address', addr], ['Status', esc(ORDER_LABEL[o.status] || o.status)]]) +
+    (gcName(o) ? '<div class="lbl">' + (manual ? 'For' : 'From') + '</div><div class="doctitle" style="font-size:17px;margin-bottom:10px">' + esc(gcName(o)) + '</div>' : '') +
+    '<div class="title" style="margin:6px 0 8px">' + esc(o.title || 'Work order') + '</div>' + linesTable(items, false) +
+    (o.scope ? '<div class="lbl" style="margin-top:14px">Scope and notes</div><div class="pre">' + esc(o.scope) + '</div>' : '') +
+    (o.status === 'declined' && o.decline_reason ? '<div class="lbl" style="margin-top:14px">Declined</div><div class="pre">' + esc(o.decline_reason) + '</div>' : '') + '</div>';
+}
+function invoiceDoc(o, pr) {
+  const c = contractor(o.contractor_id) || {}, lines = Array.isArray(pr.line_items) && pr.line_items.length ? pr.line_items : [{ desc: o.title, detail: '', qty: '1', unit: '', rate: (cents(pr.amount) / 100).toFixed(2) }];
+  const total = cents(pr.amount), due = pr.status === 'paid' ? 0 : total;
+  return '<div class="doc">' + docHead('INVOICE', [['Number', esc(pr.invoice_number)], ['Date', esc(fmtDate(pr.invoice_date))], ['Due', esc(pr.due_terms)], ['PO #', esc(pr.po)], ['Balance due', '<b style="display:inline;font-size:16px;letter-spacing:0">' + money(due) + '</b>']]) +
+    '<div class="lbl">Bill to</div><div class="doctitle" style="font-size:17px">' + esc(c.name || gcName(o)) + '</div>' + [c.address, c.phone, c.email].filter(Boolean).map(v => '<div class="mut">' + esc(v) + '</div>').join('') +
+    '<div style="height:12px"></div>' + linesTable(lines, true) +
+    '<div class="totals"><div><span>Total</span><span>' + money(total) + '</span></div><div class="due"><span>Balance due</span><span>' + money(due) + '</span></div></div>' +
+    (pr.notes ? '<div class="lbl" style="margin-top:14px">Notes</div><div class="pre">' + esc(pr.notes) + '</div>' : '') + '</div>';
+}
+
+/* line item editor, backed by S.draft.lines so nothing typed is lost when a row is added or removed */
+function lineEditor(withRate, cid) {
+  const list = priceList(cid);
+  return '<h2>Line items</h2>' + S.draft.lines.map((l, i) => '<div class="li" data-li="' + i + '"><input data-k="desc" value="' + esc(l.desc) + '" placeholder="Item, e.g. Vinyl siding" aria-label="Line ' + (i + 1) + ' item">' +
+    '<textarea data-k="detail" placeholder="Details, one per line (optional)" aria-label="Line ' + (i + 1) + ' details" style="min-height:52px;margin-top:8px">' + esc(l.detail) + '</textarea>' +
+    '<div class="two" style="margin-top:8px"><input data-k="qty" value="' + esc(l.qty) + '" inputmode="decimal" placeholder="Qty" aria-label="Line ' + (i + 1) + ' quantity"><input data-k="unit" value="' + esc(l.unit) + '" placeholder="Unit" aria-label="Line ' + (i + 1) + ' unit">' + (withRate ? '<input data-k="rate" value="' + esc(l.rate) + '" inputmode="decimal" placeholder="Rate $" aria-label="Line ' + (i + 1) + ' rate">' : '') + '</div>' +
+    '<div class="row" style="align-items:center;margin-top:4px"><button type="button" class="link" data-act="rmline" data-id="' + i + '">Remove</button>' + (withRate ? '<b id="la-' + i + '">' + money(lineCents(l)) + '</b>' : '') + '</div></div>').join('') +
+    (list.length ? '<select data-change="addsaved" aria-label="Add a line from your price list" style="margin-top:10px"><option value="">+ Add from price list…</option>' + list.map(i => '<option value="' + esc(i.id) + '">' + esc(i.title) + ' — ' + money(cents(i.rate)) + (i.unit ? ' / ' + esc(i.unit) : '') + '</option>').join('') + '</select>' : '<div class="mut" style="margin-top:8px">Save items to this contractor’s price list to add them here in one tap.</div>') +
+    '<button type="button" class="btn ghost" data-act="addline">+ Add blank line</button>';
 }
 function orderListHtml() {
   const f = S.filter, q = S.search.trim().toLowerCase();
   const list = S.orders.filter(o => f === 'all' || (f === 'open' ? (o.status === 'sent' || o.status === 'accepted') : o.status === 'complete'))
     .filter(o => !q || [o.title, o.address, o.scope, gcName(o)].some(v => String(v || '').toLowerCase().includes(q))).sort(byDate);
-  return list.length ? list.map(orderCard).join('') : '<div class="empty">' + (q ? 'Nothing matches that search.' : isMgmt() ? 'No work orders here.<br>Add one yourself, or link a contractor so they can send them.' : 'No jobs here right now.') + '</div>';
+  return list.length ? list.map(orderCard).join('') : '<div class="empty">' + (q ? 'Nothing matches that search.' : isMgmt() ? 'No work orders here.<br>Add one from a contractor, or link a contractor so they can send them.' : 'No jobs here right now.') + '</div>';
 }
 function viewOrders() {
   const f = S.filter;
@@ -400,13 +511,14 @@ function viewOrders() {
     '<div id="olist">' + orderListHtml() + '</div>';
 }
 function viewOrderForm() {
-  const o = S.edit.id ? S.orders.find(x => x.id === S.edit.id) || {} : {};
-  return msgHtml() + '<form data-form="order" class="card">' + field('ot', 'title', 'Title', o.title, 'required') +
-    '<label for="oc">Contractor</label><select id="oc" name="contractor_id"><option value="">None</option>' + S.contractors.map(c => '<option value="' + esc(c.id) + '"' + (o.contractor_id === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') + '</select>' +
-    field('oa', 'address', 'Job address', o.address, 'autocomplete="off"') + field('od', 'scheduled_date', 'Scheduled date', o.scheduled_date || (S.edit.date || ''), 'type="date"') +
-    field('op', 'pay', 'Your pay for this job', o.pay_amount != null ? (cents(o.pay_amount) / 100).toFixed(2) : '', 'inputmode="decimal" required') +
-    '<label for="os">Scope</label><textarea id="os" name="scope">' + esc(o.scope) + '</textarea>' +
-    '<label for="oi">Line items, one per line</label><textarea id="oi" name="items" placeholder="24 sq Tear-off, 1 layer">' + esc(itemsText(o.line_items)) + '</textarea><div class="mut">Start a line with quantity and unit, like "24 sq", or just type the item.</div>' +
+  const d = S.draft;
+  if (!S.contractors.length) return msgHtml() + '<div class="card"><div class="title">Add a contractor first</div><p class="mut">Every work order belongs to a contractor profile.</p><button class="btn" data-act="newcontractor">+ Add contractor</button></div>';
+  return msgHtml() + '<form data-form="order" class="card"><label for="oc">Contractor</label><select id="oc" data-d="contractor_id" required><option value="">Choose a contractor</option>' + S.contractors.map(c => '<option value="' + esc(c.id) + '"' + (d.contractor_id === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') + '</select>' +
+    dfield('ot', 'title', 'Job title', 'required placeholder="e.g. Siding, 18 sq"') + dfield('oa', 'address', 'Job address', 'autocomplete="off"') + dfield('od', 'scheduled_date', 'Scheduled date', 'type="date"') +
+    lineEditor(false, d.contractor_id) +
+    '<label for="os">Scope and notes</label><textarea id="os" data-d="scope">' + esc(d.scope) + '</textarea>' +
+    dfield('op', 'pay', 'Your pay for this job', 'inputmode="decimal" required') +
+    '<button type="button" class="link" data-act="calcpay">Fill pay from my price list</button><div class="mut">Crew never see pay or rates.</div>' +
     '<button class="btn"' + dis() + '>Save work order</button></form>';
 }
 function viewSchedule() {
@@ -422,7 +534,7 @@ function viewSchedule() {
   if (S.calDay) {
     const list = by[S.calDay] || [];
     below = '<h2>' + esc(fmtDate(S.calDay)) + '</h2>' + (list.length ? list.map(orderCard).join('') : '<div class="mut" style="padding:4px 2px 10px">Nothing on this day.</div>') +
-      (isMgmt() ? '<button class="btn ghost" data-act="neworder" data-id="' + S.calDay + '">+ New work order on this day</button>' : '');
+      (isMgmt() ? '<button class="btn ghost" data-act="neworder" data-date="' + S.calDay + '">+ New work order on this day</button>' : '');
   } else {
     const open = S.orders.filter(o => o.status === 'sent' || o.status === 'accepted').sort(byDate);
     below = '<h2>Coming up</h2>' + (open.length ? open.map(orderCard).join('') : '<div class="mut" style="padding:4px 2px">Nothing scheduled.</div>');
@@ -432,32 +544,73 @@ function viewSchedule() {
 function viewBilling() {
   const sum = st => S.pays.reduce((t, p) => t + (p.status === st ? cents(p.amount) : 0), 0);
   const ready = S.orders.filter(o => { const p = payFor(o.id); return o.status === 'complete' && (!p || p.status === 'rejected'); });
-  const sent = S.orders.filter(o => { const p = payFor(o.id); return p && p.status !== 'rejected'; });
-  return msgHtml() + '<div class="stats"><div class="card"><span class="mut">Awaiting</span><b>' + money(sum('submitted')) + '</b></div><div class="card"><span class="mut">Approved</span><b>' + money(sum('approved')) + '</b></div><div class="card"><span class="mut">Paid</span><b>' + money(sum('paid')) + '</b></div></div>' +
-    '<h2>Ready to bill</h2>' + (ready.length ? ready.map(orderCard).join('') : '<div class="mut" style="padding:4px 2px 10px">Nothing waiting. Complete a work order to bill it.</div>') +
-    '<h2>Pay requests</h2>' + (sent.length ? sent.map(orderCard).join('') : '<div class="mut" style="padding:4px 2px">None yet.</div>');
+  const sent = S.orders.filter(o => payFor(o.id)).sort((a, b) => String(payFor(b.id).invoice_date || '').localeCompare(String(payFor(a.id).invoice_date || '')));
+  return msgHtml() + '<div class="stats"><div class="card"><span class="mut">Sent</span><b>' + money(sum('submitted')) + '</b></div><div class="card"><span class="mut">Approved</span><b>' + money(sum('approved')) + '</b></div><div class="card"><span class="mut">Paid</span><b>' + money(sum('paid')) + '</b></div></div>' +
+    '<h2>Ready to invoice</h2>' + (ready.length ? ready.map(orderCard).join('') : '<div class="mut" style="padding:4px 2px 10px">Nothing waiting. Complete a work order to invoice it.</div>') +
+    '<h2>Invoices</h2>' + (sent.length ? sent.map(invoiceCard).join('') : '<div class="mut" style="padding:4px 2px">None yet.</div>');
 }
 function viewContractors() {
   return msgHtml() + '<button class="btn ghost" style="margin:0 0 12px" data-act="newcontractor">+ Add contractor</button>' +
-    (S.contractors.length ? S.contractors.map(c => '<button class="card" data-act="opencontractor" data-id="' + esc(c.id) + '"><div class="row"><div><div class="title">' + esc(c.name) + '</div><div class="mut">' + esc(c.contact_name || '') + '</div></div><span class="pill ' + (c.link_status === 'active' ? 's-complete' : c.link_status === 'pending' ? 's-sent' : '') + '">' + esc(LINK_LABEL[c.link_status] || '') + '</span></div></button>').join('')
-      : '<div class="empty">Add the contractors you work for.</div>');
+    (S.contractors.length ? S.contractors.map(contractorCard).join('') : '<div class="empty">Add the contractors you work for.<br>Each one gets a profile that holds their jobs, invoices and price list.</div>');
 }
-function viewContractorForm() {
-  const c = S.edit.id ? contractor(S.edit.id) || {} : {};
-  let link = '', jobs = '';
-  if (c.id) {
-    if (c.link_status === 'active') link = '<div class="card"><div class="title">Linked' + (c.linked_name ? ' to ' + esc(c.linked_name) : '') + '</div><p class="mut">This contractor can send work orders straight into your account and sees your responses, completion photos and pay requests.</p><button class="btn bad" data-act="unlink"' + dis() + '>Unlink</button></div>';
+function contractorDetailsForm(c) {
+  return '<form data-form="contractor" class="card">' + field('kn', 'name', 'Contractor name', c.name, 'required') + field('kc', 'contact_name', 'Contact person', c.contact_name) +
+    field('kp', 'phone', 'Phone', c.phone, 'type="tel"') + field('ke', 'email', 'Email', c.email, 'type="email"') + field('ka', 'address', 'Billing address', c.address) +
+    '<label for="ko">Notes</label><textarea id="ko" name="notes">' + esc(c.notes) + '</textarea><button class="btn"' + dis() + '>Save contractor</button></form>';
+}
+function viewContractor() {
+  const c = S.edit.id ? contractor(S.edit.id) : null;
+  if (!c) return msgHtml() + contractorDetailsForm({});
+  const v = S.cview, mine = S.orders.filter(o => o.contractor_id === c.id).sort(byDate), inv = mine.filter(o => payFor(o.id)), items = S.saved.filter(i => i.contractor_id === c.id), general = S.saved.filter(i => !i.contractor_id);
+  const chip = (k, t) => '<button data-act="cview" data-id="' + k + '" class="' + (v === k ? 'on' : '') + '" aria-pressed="' + (v === k) + '">' + t + '</button>';
+  const itemCard = i => '<button class="card" data-act="opensaved" data-id="' + esc(i.id) + '"><div class="row"><div><div class="title">' + esc(i.title) + '</div>' + (i.detail ? '<div class="mut pre">' + esc(i.detail) + '</div>' : '') + '</div><div style="text-align:right"><div class="title">' + money(cents(i.rate)) + '</div><div class="mut">' + (i.unit ? 'per ' + esc(i.unit) : '') + '</div></div></div></button>';
+  let body;
+  if (v === 'invoices') body = inv.length ? inv.map(invoiceCard).join('') : '<div class="empty">No invoices for this contractor yet.<br>Complete a job, then create its invoice.</div>';
+  else if (v === 'prices') body = '<p class="mut" style="margin:0 2px 10px">Your saved line items and rates for this contractor. Add them to a work order or invoice in one tap. Only owners, managers and project managers see rates.</p><button class="btn ghost" style="margin:0 0 12px" data-act="newsaved">+ Add saved item</button>' +
+    (items.length ? items.map(itemCard).join('') : '<div class="mut" style="padding:4px 2px 10px">Nothing saved for this contractor yet.</div>') + (general.length ? '<h2>Saved for every contractor</h2>' + general.map(itemCard).join('') : '');
+  else if (v === 'details') {
+    let link;
+    if (c.link_status === 'active') link = '<div class="card"><div class="title">Linked' + (c.linked_name ? ' to ' + esc(c.linked_name) : '') + '</div><p class="mut">This contractor can send work orders straight into your account and sees your responses, completion photos and invoices.</p><button class="btn bad" data-act="unlink"' + dis() + '>Unlink</button></div>';
     else if (c.link_status === 'pending' && c.link_code) link = '<div class="card"><div class="title">Link code</div><div class="pay" style="letter-spacing:.12em;margin:6px 0">' + esc(c.link_code) + '</div><p class="mut">Give this code to your contractor. They enter it in their system (for example Better View Pro). It works once and expires ' + esc(fmtDate(String(c.link_code_expires || '').slice(0, 10))) + '.</p><div class="two"><button class="btn bad" data-act="unlink"' + dis() + '>Cancel code</button><button class="btn ghost" data-act="reload"' + dis() + '>Check status</button></div></div>';
     else link = '<div class="card"><div class="title">Link this contractor</div><p class="mut">If this contractor uses Better View Pro, linking lets them send work orders straight to you. You create a code and give it to them.</p>' + (canBill() ? '<button class="btn" data-act="linkcode"' + dis() + '>Create link code</button>' : '<div class="mut">Only the owner or a manager can link.</div>') + '</div>';
-    const list = S.orders.filter(o => o.contractor_id === c.id).sort(byDate);
-    jobs = '<h2>Work orders</h2>' + (list.length ? list.map(orderCard).join('') : '<div class="mut" style="padding:4px 2px">None yet.</div>');
-  }
-  return msgHtml() + '<form data-form="contractor" class="card">' + field('kn', 'name', 'Contractor name', c.name, 'required') + field('kc', 'contact_name', 'Contact person', c.contact_name) +
-    field('kp', 'phone', 'Phone', c.phone, 'type="tel"') + field('ke', 'email', 'Email', c.email, 'type="email"') +
-    '<label for="ko">Notes</label><textarea id="ko" name="notes">' + esc(c.notes) + '</textarea><button class="btn"' + dis() + '>Save contractor</button></form>' + link + jobs;
+    body = contractorDetailsForm(c) + link;
+  } else body = '<button class="btn ghost" style="margin:0 0 12px" data-act="neworder" data-cid="' + esc(c.id) + '">+ New work order</button>' + (mine.length ? mine.map(orderCard).join('') : '<div class="empty">No jobs for this contractor yet.</div>');
+  return msgHtml() + '<div class="card"><div class="row"><div><div class="title" style="font-size:20px">' + esc(c.name) + '</div><div class="mut">' + esc(c.contact_name || '') + '</div>' +
+    (c.phone ? '<div><a href="tel:' + esc(String(c.phone).replace(/[^\d+]/g, '')) + '">' + esc(c.phone) + '</a></div>' : '') + (c.email ? '<div><a href="mailto:' + esc(c.email) + '">' + esc(c.email) + '</a></div>' : '') + '</div>' +
+    (c.link_status === 'active' ? pill('s-complete', 'Linked') : '') + '</div></div>' +
+    '<div class="chips">' + chip('jobs', 'Jobs (' + mine.length + ')') + chip('invoices', 'Invoices (' + inv.length + ')') + chip('prices', 'Price list') + chip('details', 'Details') + '</div>' + body;
+}
+function viewSavedForm() {
+  const i = S.edit.id ? S.saved.find(x => x.id === S.edit.id) || {} : {}, c = contractor(S.edit.cid) || {};
+  const all = S.edit.id ? !i.contractor_id : false;
+  return msgHtml() + '<form data-form="saved" class="card">' + field('st', 'title', 'Item', i.title, 'required placeholder="e.g. Vinyl siding"') +
+    '<label for="sd">Usual details (optional)</label><textarea id="sd" name="detail" style="min-height:60px">' + esc(i.detail) + '</textarea>' +
+    '<div class="two"><div style="flex:1">' + field('sr', 'rate', 'Rate $', i.rate != null ? (cents(i.rate) / 100).toFixed(2) : '', 'inputmode="decimal" required') + '</div><div style="flex:1">' + field('su', 'unit', 'Unit', i.unit, 'placeholder="sq, lf, ea"') + '</div></div>' +
+    '<label class="check"><input type="checkbox" name="all" value="1"' + (all ? ' checked' : '') + '> Use for every contractor, not just ' + esc(c.name || 'this one') + '</label>' +
+    '<button class="btn"' + dis() + '>Save item</button></form>' + (S.edit.id ? '<button class="btn bad" data-act="delsaved"' + dis() + '>Delete item</button>' : '');
+}
+function viewInvoiceEdit(o) {
+  const c = contractor(o.contractor_id) || {}, manual = o.source === 'manual';
+  return msgHtml() + '<form data-form="invoice" class="card"><div class="title">Invoice for ' + esc(c.name || gcName(o) || 'this job') + '</div><div class="mut">' + esc(o.title) + '</div>' +
+    '<div class="two"><div style="flex:1">' + dfield('in', 'number', 'Invoice number') + '</div><div style="flex:1">' + dfield('idt', 'date', 'Date', 'type="date"') + '</div></div>' +
+    '<div class="two"><div style="flex:1">' + dfield('idu', 'due', 'Due') + '</div><div style="flex:1">' + dfield('ipo', 'po', 'PO # or job address') + '</div></div>' +
+    lineEditor(true, o.contractor_id) +
+    '<div class="totals" style="margin-top:14px"><div class="due"><span>Total</span><span id="invtotal">' + money(linesTotal(S.draft.lines)) + '</span></div></div>' +
+    '<label for="ino">Notes (optional)</label><textarea id="ino" data-d="notes">' + esc(S.draft.notes) + '</textarea>' +
+    (o.contractor_id ? '<label class="check"><input type="checkbox" data-d="saveRates"' + (S.draft.saveRates ? ' checked' : '') + '> Save these items and rates to ' + esc(c.name || 'this contractor') + '’s price list</label>' : '') +
+    '<button class="btn"' + dis() + '>' + (manual ? 'Save invoice' : 'Send invoice to contractor') + '</button></form>';
+}
+function viewInvoice(o) {
+  const pr = payFor(o.id), manual = o.source === 'manual';
+  if (!pr) return msgHtml() + '<div class="empty">No invoice for this work order yet.</div>';
+  const editable = canBill() && (pr.status === 'rejected' || (pr.status === 'submitted' && manual));
+  return msgHtml() + '<div class="card noprint"><div class="row" style="align-items:center"><div>' + pill('s-' + pr.status, PAY_LABEL[pr.status] || pr.status) + (!manual && pr.status !== 'paid' && pr.status !== 'rejected' ? '<div class="mut" style="margin-top:4px">The contractor updates this status.</div>' : '') + (pr.status === 'rejected' ? '<div class="mut" style="margin-top:4px">The contractor rejected this invoice. Fix it and resend.</div>' : '') + '</div>' +
+    '<button class="link" data-act="open" data-id="' + esc(o.id) + '">Open work order</button></div>' +
+    '<div class="two"><button class="btn ghost" data-act="print">Print or save PDF</button>' + (editable ? '<button class="btn ghost" data-act="editinvoice"' + dis() + '>' + (pr.status === 'rejected' ? 'Fix and resend' : 'Edit') + '</button>' : '') + '</div>' +
+    (manual && canBill() && pr.status !== 'paid' && pr.status !== 'rejected' ? '<div class="two">' + (pr.status === 'submitted' ? '<button class="btn ghost" data-act="markpay" data-id="approved"' + dis() + '>Mark approved</button>' : '') + '<button class="btn ok" data-act="markpay" data-id="paid"' + dis() + '>Mark paid</button></div>' : '') + '</div>' + invoiceDoc(o, pr);
 }
 function viewAccount() {
-  const owner = role() === 'owner', me = S.session.user.id;
+  const owner = role() === 'owner', me = S.session.user.id, co = S.company || {};
   let team = '';
   if (isMgmt()) {
     team = '<h2>Team</h2><div class="card">' + S.team.map(t => {
@@ -465,13 +618,14 @@ function viewAccount() {
       return '<div class="row" style="align-items:center;padding:8px 0;border-bottom:1px solid var(--line)"><div><div class="title">' + esc(t.display_name || t.email || 'Member') + (t.id === me ? ' (you)' : '') + '</div><div class="mut">' + esc(t.email || '') + '</div></div>' +
         (editable ? '<div style="text-align:right"><select data-change="setrole" data-id="' + esc(t.id) + '" aria-label="Role for ' + esc(t.display_name || t.email) + '" style="width:auto;padding:7px">' + roleOptions(t.role, ['manager', 'project_manager', 'laborer']) + '</select>' +
           (S.form && S.form.removing === t.id ? '<div><button class="link" style="color:var(--bad)" data-act="removeyes" data-id="' + esc(t.id) + '">Confirm remove</button></div>' : '<div><button class="link" data-act="remove" data-id="' + esc(t.id) + '">Remove</button></div>') + '</div>'
-          : '<span class="pill">' + esc(ROLE_LABEL[t.role] || t.role) + '</span>') + '</div>';
+          : pill('', ROLE_LABEL[t.role] || t.role)) + '</div>';
     }).join('') +
-      (canBill() ? '<form data-form="invite"><label for="ir">Add a team member</label><select id="ir" name="role">' + roleOptions('laborer', owner ? ['laborer', 'project_manager', 'manager'] : ['laborer', 'project_manager']) + '</select><div class="mut" style="margin-top:6px">Crew see scheduled jobs and can mark them complete with photos. They never see pay. Project managers see everything but cannot bill. Managers can also bill and link contractors.</div><button class="btn ghost"' + dis() + '>Create join code</button></form>' : '') + '</div>' +
+      (canBill() ? '<form data-form="invite"><label for="ir">Add a team member</label><select id="ir" name="role">' + roleOptions('laborer', owner ? ['laborer', 'project_manager', 'manager'] : ['laborer', 'project_manager']) + '</select><div class="mut" style="margin-top:6px">Crew see scheduled jobs and can mark them complete with photos. They never see pay. Project managers see everything but cannot invoice. Managers can also invoice and link contractors.</div><button class="btn ghost"' + dis() + '>Create join code</button></form>' : '') + '</div>' +
       (S.invites.length ? '<h2>Join codes waiting</h2>' + S.invites.map(i => '<div class="card"><div class="row" style="align-items:center"><div><div class="pay" style="letter-spacing:.1em;font-size:19px">' + esc(i.code) + '</div><div class="mut">' + esc(ROLE_LABEL[i.role]) + ' · expires ' + esc(fmtDate(String(i.expires_at).slice(0, 10))) + '</div></div><button class="link" data-act="cancelinvite" data-id="' + esc(i.id) + '">Cancel</button></div><div class="mut">They open this app, tap "Join your company with a code", and enter it.</div></div>').join('') : '');
   }
   return msgHtml() + '<form data-form="account" class="card">' +
-    (owner ? field('ac', 'company', 'Company name', S.company && S.company.name, 'required') : '<div class="title">' + esc(S.company && S.company.name || 'Your company') + '</div>') +
+    (owner ? field('ac', 'company', 'Company name', co.name, 'required') + field('aph', 'phone', 'Business phone', co.phone, 'type="tel"') + field('aem', 'email', 'Business email', co.email, 'type="email"') + field('aad', 'address', 'Business address', co.address) + '<div class="mut" style="margin-top:6px">These appear at the top of your invoices and work orders.</div>'
+      : '<div class="title">' + esc(co.name || 'Your company') + '</div>') +
     field('an', 'display', 'Your name', S.profile.display_name, 'required') +
     '<div class="mut" style="margin-top:8px">' + esc(S.session.user.email) + ' · ' + esc(ROLE_LABEL[role()] || role()) + '</div><button class="btn ghost"' + dis() + '>Save</button></form>' + team +
     '<button class="btn ghost" data-act="signout">Sign out</button>';
@@ -480,34 +634,25 @@ function photoGrid(arr) {
   return '<div class="photos">' + arr.map(p => '<a href="' + esc(photoUrl(p)) + '" target="_blank" rel="noopener"><img loading="lazy" src="' + esc(photoUrl(p)) + '" alt="' + esc(p.caption || 'Job photo') + '"></a>').join('') + '</div>';
 }
 function viewDetail(o) {
-  const pr = payFor(o.id), mg = isMgmt(), manual = o.source === 'manual', items = Array.isArray(o.line_items) ? o.line_items : [], ph = Array.isArray(o.photos) ? o.photos : [], cph = Array.isArray(o.completion_photos) ? o.completion_photos : [];
+  const pr = payFor(o.id), mg = isMgmt(), manual = o.source === 'manual', ph = Array.isArray(o.photos) ? o.photos : [], cph = Array.isArray(o.completion_photos) ? o.completion_photos : [];
   let act = '';
   if (o.status === 'sent') {
-    act = '<div class="card"><div class="title">Respond to this date</div><div class="mut">' + esc(fmtDate(o.scheduled_date)) + '</div>' +
+    act = '<div class="card noprint"><div class="title">Respond to this date</div><div class="mut">' + esc(fmtDate(o.scheduled_date)) + '</div>' +
       (S.form && S.form.declining ? '<form data-form="decline"><label for="rs">Reason (optional)</label><textarea id="rs" name="reason"></textarea><div class="two"><button type="button" class="btn ghost" data-act="canceldecline">Back</button><button class="btn bad"' + dis() + '>Confirm decline</button></div></form>'
         : '<div class="two"><button class="btn bad" data-act="decline"' + dis() + '>Decline</button><button class="btn ok" data-act="accept"' + dis() + '>Accept</button></div>') + '</div>';
   } else if (o.status === 'accepted') {
-    act = '<form data-form="complete" class="card"><div class="title">Mark complete</div><label for="cp">Completion photos (at least one required)</label><input id="cp" name="photos" type="file" accept="image/*" multiple required>' +
+    act = '<form data-form="complete" class="card noprint"><div class="title">Mark complete</div><label for="cp">Completion photos (at least one required)</label><input id="cp" name="photos" type="file" accept="image/*" multiple required>' +
       '<label for="nt">Notes (optional)</label><textarea id="nt" name="notes"></textarea><button class="btn ok"' + dis() + '>' + (S.busy ? 'Working…' : 'Mark complete') + '</button></form>' +
-      (mg && manual ? '<div class="two" style="margin-bottom:12px"><button class="btn ghost" style="margin-top:0" data-act="editorder"' + dis() + '>Edit</button><button class="btn bad" style="margin-top:0" data-act="cancelorder"' + dis() + '>Cancel job</button></div>' : '');
+      (mg && manual ? '<div class="two noprint" style="margin-bottom:12px"><button class="btn ghost" style="margin-top:0" data-act="editorder"' + dis() + '>Edit</button><button class="btn bad" style="margin-top:0" data-act="cancelorder"' + dis() + '>Cancel job</button></div>' : '');
   } else if (o.status === 'complete' && mg) {
-    if (pr && pr.status !== 'rejected') {
-      act = '<div class="card"><div class="row"><div><div class="title">Pay request</div><div class="pay">' + money(cents(pr.amount)) + '</div>' + (pr.notes ? '<div class="mut pre">' + esc(pr.notes) + '</div>' : '') + '</div><span class="pill s-' + esc(pr.status) + '">' + esc(PAY_LABEL[pr.status] || pr.status) + '</span></div>' +
-        (manual && canBill() && pr.status !== 'paid' ? '<div class="two">' + (pr.status === 'submitted' ? '<button class="btn ghost" data-act="markpay" data-id="approved"' + dis() + '>Mark approved</button>' : '') + '<button class="btn ok" data-act="markpay" data-id="paid"' + dis() + '>Mark paid</button></div>'
-          : !manual && pr.status !== 'paid' ? '<p class="mut" style="margin:8px 0 0">The contractor updates this status.</p>' : '') + '</div>';
-    } else if (canBill()) {
-      act = '<form data-form="pay" class="card"><div class="title">' + (pr ? 'Resubmit pay request' : 'Submit pay request') + '</div>' + (pr ? '<div class="msg err" style="margin-top:8px">The contractor rejected the last request.</div>' : '') +
-        field('am', 'amount', 'Amount', (cents(o.pay_amount) / 100).toFixed(2), 'inputmode="decimal" required') + '<label for="pn">Notes (optional)</label><textarea id="pn" name="notes"></textarea><button class="btn"' + dis() + '>' + (manual ? 'Record pay request' : 'Send to contractor') + '</button></form>';
-    } else act = '<div class="msg note">Only the owner or a manager can submit a pay request.</div>';
+    if (pr) act = '<div class="card noprint"><div class="row" style="align-items:center"><div><div class="title">Invoice ' + esc(pr.invoice_number || '') + '</div><div class="pay">' + money(cents(pr.amount)) + '</div></div>' + pill('s-' + pr.status, PAY_LABEL[pr.status] || pr.status) + '</div><button class="btn ghost" data-act="openinvoice" data-id="' + esc(o.id) + '">View invoice</button></div>';
+    else if (canBill()) act = '<div class="card noprint"><div class="title">Ready to invoice</div><p class="mut" style="margin:4px 0 0">The invoice starts from this work order’s line items and your saved rates.</p><button class="btn" data-act="editinvoice">Create invoice</button></div>';
+    else act = '<div class="msg note noprint">Only the owner or a manager can invoice.</div>';
   }
-  return msgHtml() + '<div class="card"><div class="row"><div><div class="title" style="font-size:19px">' + esc(o.title || 'Work order') + '</div>' + (gcName(o) ? '<div class="mut">' + (manual ? 'For ' : 'From ') + esc(gcName(o)) + '</div>' : '') + '</div><span class="pill s-' + esc(o.status) + '">' + esc(ORDER_LABEL[o.status] || o.status) + '</span></div>' +
-    (o.address ? '<p style="margin:10px 0 2px"><a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(o.address) + '" target="_blank" rel="noopener">' + esc(o.address) + '</a></p>' : '') + '<div class="mut">' + esc(fmtDate(o.scheduled_date)) + '</div>' +
-    (o.status === 'declined' && o.decline_reason ? '<div class="mut">Declined: ' + esc(o.decline_reason) + '</div>' : '') +
-    (mg ? '<div style="margin-top:10px"><span class="mut">Your pay</span><div class="pay">' + money(cents(o.pay_amount)) + '</div></div>' : '') + '</div>' + act +
-    '<h2>Scope</h2><div class="card pre">' + (esc(o.scope) || '<span class="mut">No scope written.</span>') + '</div>' +
-    (items.length ? '<h2>Line items</h2><div class="card"><table><thead><tr><th>Item</th><th class="n">Qty</th></tr></thead><tbody>' + items.map(i => '<tr><td>' + esc(i.desc) + '</td><td class="n">' + esc(i.qty) + ' ' + esc(i.unit) + '</td></tr>').join('') + '</tbody></table></div>' : '') +
-    (ph.length ? '<h2>Job photos</h2><div class="card">' + photoGrid(ph) + '</div>' : '') +
-    (cph.length || o.completion_notes ? '<h2>Completion</h2><div class="card">' + (cph.length ? photoGrid(cph) : '') + (o.completion_notes ? '<p class="pre" style="margin:10px 0 0">' + esc(o.completion_notes) + '</p>' : '') + '</div>' : '');
+  return msgHtml() + (mg ? '<div class="card noprint"><div class="row" style="align-items:center"><div><span class="mut">Your pay</span><div class="pay">' + money(cents(o.pay_amount)) + '</div></div><button class="link" data-act="print">Print work order</button></div><div class="mut">Pay is not printed and crew never see it.</div></div>' : '') +
+    act + workOrderDoc(o) +
+    (ph.length ? '<h2 class="noprint">Job photos</h2><div class="card noprint">' + photoGrid(ph) + '</div>' : '') +
+    (cph.length || o.completion_notes ? '<h2 class="noprint">Completion</h2><div class="card noprint">' + (cph.length ? photoGrid(cph) : '') + (o.completion_notes ? '<p class="pre" style="margin:10px 0 0">' + esc(o.completion_notes) + '</p>' : '') + '</div>' : '');
 }
 function render() {
   let h;
@@ -515,11 +660,15 @@ function render() {
   else if (S.view === 'auth') h = viewAuth();
   else if (S.view === 'onboard') h = viewOnboard();
   else {
-    const tabs = TABS(); if (!tabs.some(t => t[0] === S.tab)) S.tab = 'orders';
-    const o = !S.edit && S.detailId && S.orders.find(x => String(x.id) === String(S.detailId));
-    const sub = S.edit || o;
-    const title = S.edit ? (S.edit.kind === 'order' ? (S.edit.id ? 'Edit work order' : 'New work order') : (S.edit.id ? 'Contractor' : 'Add contractor')) : o ? (isMgmt() ? 'Work order' : 'Job') : tabs.find(t => t[0] === S.tab)[2];
-    const body = S.edit ? (S.edit.kind === 'order' ? viewOrderForm() : viewContractorForm()) : o ? viewDetail(o) : S.tab === 'orders' ? viewOrders() : S.tab === 'schedule' ? viewSchedule() : S.tab === 'billing' ? viewBilling() : S.tab === 'contractors' ? viewContractors() : viewAccount();
+    const tabs = TABS(); if (!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
+    const e = S.edit, o = S.detailId ? S.orders.find(x => String(x.id) === String(S.detailId)) : null, sub = e || o;
+    let title, body;
+    if (e && e.kind === 'order') { title = e.id ? 'Edit work order' : 'New work order'; body = viewOrderForm(); }
+    else if (e && e.kind === 'contractor') { title = e.id ? 'Contractor' : 'Add contractor'; body = viewContractor(); }
+    else if (e && e.kind === 'saved') { title = e.id ? 'Saved item' : 'New saved item'; body = viewSavedForm(); }
+    else if (e && e.kind === 'invoice' && o) { title = e.mode === 'edit' ? 'Invoice' : 'Invoice ' + ((payFor(o.id) || {}).invoice_number || ''); body = e.mode === 'edit' ? viewInvoiceEdit(o) : viewInvoice(o); }
+    else if (o) { title = isMgmt() ? 'Work order' : 'Job'; body = viewDetail(o); }
+    else { title = tabs.find(t => t[0] === S.tab)[2]; body = S.tab === 'orders' ? viewOrders() : S.tab === 'schedule' ? viewSchedule() : S.tab === 'billing' ? viewBilling() : S.tab === 'contractors' ? viewContractors() : viewAccount(); }
     h = demoBar() + '<header>' + (sub ? '<button data-act="back" aria-label="Back">‹ Back</button>' : '') + '<h1>' + esc(title) + '</h1>' + (sub ? '' : '<button data-act="reload" aria-label="Refresh">↻</button>') + '</header><main>' + body + '</main>' +
       '<nav aria-label="Sections"><div>' + tabs.map(t => '<button data-act="tab" data-id="' + t[0] + '" class="' + (!sub && S.tab === t[0] ? 'on' : '') + '"><b aria-hidden="true">' + t[1] + '</b>' + t[2] + '</button>').join('') + '</div></nav>';
   }
@@ -528,6 +677,24 @@ function render() {
 
 /* ---------- flow ---------- */
 const flash = (kind, text) => { S.msg = { kind, text }; };
+// screens stack, so Back always returns to where you came from (a contractor card, the calendar, the invoice list)
+function go(edit, detailId, replace) {
+  if (!replace) S.stack.push({ edit: S.edit, detailId: S.detailId, draft: S.draft });
+  S.edit = edit || null; S.detailId = detailId || null; S.msg = null; S.form = null; window.scrollTo(0, 0);
+}
+function back() { const p = S.stack.pop() || {}; S.edit = p.edit || null; S.detailId = p.detailId || null; S.draft = p.draft || null; S.msg = null; S.form = null; }
+function orderDraft(o, cid, date) {
+  return o ? { contractor_id: o.contractor_id || '', title: o.title || '', address: o.address || '', scheduled_date: o.scheduled_date || '', scope: o.scope || '', pay: (cents(o.pay_amount) / 100).toFixed(2),
+      lines: (Array.isArray(o.line_items) && o.line_items.length ? o.line_items : [blankLine()]).map(l => ({ desc: l.desc || '', detail: l.detail || '', qty: l.qty == null ? '' : String(l.qty), unit: l.unit || '', rate: '' })) }
+    : { contractor_id: cid || '', title: '', address: '', scheduled_date: date || '', scope: '', pay: '', lines: [blankLine()] };
+}
+function invoiceDraft(o) {
+  const pr = payFor(o.id); let lines;
+  if (pr && Array.isArray(pr.line_items) && pr.line_items.length) lines = pr.line_items.map(l => ({ desc: l.desc || '', detail: l.detail || '', qty: String(l.qty == null ? '' : l.qty), unit: l.unit || '', rate: (cents(l.rate) / 100).toFixed(2) }));
+  else lines = (Array.isArray(o.line_items) ? o.line_items : []).map(l => { const s = priceFor(o.contractor_id, l.desc); return { desc: l.desc || '', detail: l.detail || '', qty: l.qty == null ? '' : String(l.qty), unit: l.unit || (s && s.unit) || '', rate: s ? (cents(s.rate) / 100).toFixed(2) : '' }; });
+  if (!lines.length) lines = [{ desc: o.title || '', detail: '', qty: '1', unit: '', rate: (cents(pr ? pr.amount : o.pay_amount) / 100).toFixed(2) }];
+  return { number: (pr && pr.invoice_number) || nextInvoiceNumber(), date: (pr && pr.invoice_date) || day(0), due: (pr && pr.due_terms) || 'On receipt', po: (pr && pr.po) || o.address || '', notes: (pr && pr.notes) || '', lines, saveRates: false };
+}
 async function enter() {                 // after a session exists: profile -> company setup if needed -> data
   await api.loadProfile();
   if (!S.profile) {
@@ -538,7 +705,7 @@ async function enter() {                 // after a session exists: profile -> c
     }
     if (!S.profile) { S.form = pend || {}; S.view = 'onboard'; return; }
   }
-  await api.loadData(); S.view = 'app';
+  await api.loadData(); S.view = 'app'; S.tab = TABS()[0][0]; S.stack = []; S.edit = null; S.detailId = null;
 }
 async function run(fn, okText) {         // one place for busy state + error display
   if (S.busy) return; S.busy = true; S.msg = null; render();
@@ -550,13 +717,13 @@ const fields = form => Object.fromEntries([...new FormData(form)].filter(([, v])
 async function signUpFlow(f, pend) {
   setPending(pend);
   const signedIn = await api.signUp(f.email, f.password);
-  if (!signedIn) { S.authMode = 'signin'; flash('note', 'Check your email and tap the confirmation link. It brings you back here and finishes setup. Use this same phone or computer.'); return; }
+  if (!signedIn) { S.authMode = 'checkemail'; S.form = { email: f.email }; return; }
   await enter();
 }
 
 document.addEventListener('submit', ev => {
   const form = ev.target.closest('[data-form]'); if (!form) return; ev.preventDefault();
-  const f = fields(form), kind = form.dataset.form, id = S.detailId;
+  const f = fields(form), kind = form.dataset.form, id = S.detailId, d = S.draft;
   if (kind === 'signin') run(async () => { await api.signIn(f.email, f.password); await enter(); });
   else if (kind === 'signup') run(() => signUpFlow(f, { mode: 'new', company: f.company, display: f.display }));
   else if (kind === 'joinsignup') run(() => signUpFlow(f, { mode: 'join', code: f.code, display: f.display }));
@@ -564,38 +731,92 @@ document.addEventListener('submit', ev => {
   else if (kind === 'newpw') run(async () => { await api.setPassword(f.password); await enter(); }, 'Password saved.');
   else if (kind === 'company') { S.form = Object.assign({}, S.form, f); run(async () => { await api.createCompany(f.company, f.display); await enter(); }); }
   else if (kind === 'join') { S.form = Object.assign({}, S.form, { code: f.code, display: f.display }); run(async () => { await api.joinTeam(f.code, f.display); await enter(); }); }
-  else if (kind === 'account') run(async () => { await api.updateAccount(f.company, f.display); await api.loadProfile(); await api.loadData(); }, 'Saved.');
+  else if (kind === 'account') run(async () => { await api.updateAccount(f); await api.loadProfile(); await api.loadData(); }, 'Saved.');
   else if (kind === 'invite') run(async () => { await api.createInvite(f.role); await api.loadData(); }, 'Join code created. Give it to your team member.');
-  else if (kind === 'contractor') run(async () => { await api.saveContractor(S.edit.id, f); await api.loadData(); if (!S.edit.id) S.edit = null; }, 'Contractor saved.');
+  else if (kind === 'contractor') run(async () => {
+    const isNew = !S.edit.id, r = await api.saveContractor(S.edit.id, f); await api.loadData();
+    if (isNew) { const c = S.contractors.find(x => r && r.id ? x.id === r.id : x.name === f.name); if (c) { S.edit = { kind: 'contractor', id: c.id }; S.cview = 'jobs'; } else back(); }
+  }, 'Contractor saved.');
+  else if (kind === 'saved') run(async () => {
+    const c = parseMoney(f.rate, true); if (c == null) throw appErr('amount_invalid', 'Enter a rate like 150 or 2.50.');
+    await api.saveItem(S.edit.id, { contractor_id: f.all ? null : S.edit.cid, title: f.title, detail: f.detail, unit: f.unit, rateCents: c }); await api.loadData(); back();
+  }, 'Saved to the price list.');
   else if (kind === 'order') run(async () => {
-    const c = parseMoney(f.pay, true); if (c == null) throw appErr('amount_invalid');
-    const r = await api.saveOrder(S.edit.id, { contractor_id: f.contractor_id, title: f.title, address: f.address, scope: f.scope, line_items: parseItems(f.items), payCents: c, scheduled_date: f.scheduled_date });
-    await api.loadData(); S.detailId = S.edit.id || (r && r.id) || null; S.edit = null;
+    const c = parseMoney(d.pay, true); if (c == null) throw appErr('amount_invalid');
+    if (!d.contractor_id) throw appErr('contractor_not_found', 'Choose a contractor.');
+    const r = await api.saveOrder(S.edit.id, { contractor_id: d.contractor_id, title: d.title.trim(), address: d.address.trim(), scope: d.scope.trim(), line_items: cleanLines(d.lines, false), payCents: c, scheduled_date: d.scheduled_date });
+    await api.loadData(); const oid = S.edit.id || (r && r.id); S.draft = null;
+    if (S.edit.id) back(); else go(null, oid, true);
   }, 'Work order saved.');
+  else if (kind === 'invoice') run(async () => {
+    if (!(linesTotal(d.lines) > 0)) throw appErr('amount_required');
+    const o = S.orders.find(x => x.id === id);
+    await api.submitInvoice(id, d);
+    if (d.saveRates && o && o.contractor_id) for (const l of cleanLines(d.lines, true)) {
+      const rc = parseMoney(l.rate, true); if (!rc) continue;
+      const cur = S.saved.find(i => i.contractor_id === o.contractor_id && i.title.trim().toLowerCase() === l.desc.toLowerCase());
+      await api.saveItem(cur ? cur.id : null, { contractor_id: o.contractor_id, title: l.desc, detail: cur ? cur.detail : '', unit: l.unit, rateCents: rc });
+    }
+    await api.loadData(); S.draft = null; S.edit = { kind: 'invoice', mode: 'view' };
+  }, 'Invoice saved.');
   else if (kind === 'decline') run(async () => { await api.respond(id, false, f.reason); S.form = null; await api.loadData(); }, 'Declined. The contractor will see your response.');
   else if (kind === 'complete') { const files = [...form.querySelector('[name=photos]').files]; run(async () => { if (!files.length) throw appErr('photo_required'); await api.complete(id, files, f.notes); await api.loadData(); }, 'Marked complete.'); }
-  else if (kind === 'pay') run(async () => { const c = parseMoney(f.amount); if (c == null) throw appErr('amount_required', 'Enter a dollar amount like 1250 or 1250.00.'); await api.submitPay(id, c, f.notes); await api.loadData(); }, 'Pay request saved.');
 });
-document.addEventListener('input', ev => {            // search filters the list without redrawing the box you are typing in
-  if (ev.target.id !== 'q') return; S.search = ev.target.value;
-  const l = document.getElementById('olist'); if (l) l.innerHTML = orderListHtml();
+document.addEventListener('input', ev => {            // typing never redraws the screen; it only updates state and totals
+  const t = ev.target;
+  if (t.id === 'q') { S.search = t.value; const l = document.getElementById('olist'); if (l) l.innerHTML = orderListHtml(); return; }
+  if (!S.draft || t.type === 'checkbox') return;
+  if (t.dataset.d) S.draft[t.dataset.d] = t.value;
+  else if (t.dataset.k) {
+    const row = t.closest('[data-li]'); if (!row) return; const i = Number(row.dataset.li); S.draft.lines[i][t.dataset.k] = t.value;
+    const a = document.getElementById('la-' + i); if (a) a.textContent = money(lineCents(S.draft.lines[i]));
+    const tt = document.getElementById('invtotal'); if (tt) tt.textContent = money(linesTotal(S.draft.lines));
+  }
 });
 document.addEventListener('change', ev => {
-  const el = ev.target.closest('[data-change]'); if (!el) return;
+  const t = ev.target;
+  if (S.draft && t.dataset.d) {
+    if (t.type === 'checkbox') { S.draft[t.dataset.d] = t.checked; return; }
+    S.draft[t.dataset.d] = t.value; if (t.dataset.d === 'contractor_id') render(); return;
+  }
+  const el = t.closest('[data-change]'); if (!el) return;
   if (el.dataset.change === 'setrole') run(async () => { await api.setRole(el.dataset.id, el.value); await api.loadData(); }, 'Role updated.');
+  else if (el.dataset.change === 'addsaved' && el.value && S.draft) {
+    const i = S.saved.find(x => x.id === el.value); if (!i) return;
+    const line = { desc: i.title, detail: i.detail || '', qty: '', unit: i.unit || '', rate: (cents(i.rate) / 100).toFixed(2) };
+    const last = S.draft.lines[S.draft.lines.length - 1];
+    if (last && !String(last.desc).trim() && !String(last.qty).trim()) S.draft.lines[S.draft.lines.length - 1] = line; else S.draft.lines.push(line);
+    render(); const q = document.querySelector('[data-li="' + (S.draft.lines.length - 1) + '"] [data-k=qty]'); if (q) q.focus();
+  }
 });
 document.addEventListener('click', ev => {
   const b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
-  const a = b.dataset.act, id = b.dataset.id;
+  const a = b.dataset.act, id = b.dataset.id, cur = S.detailId ? S.orders.find(x => x.id === S.detailId) : null;
   if (a === 'authmode') { S.authMode = id; S.msg = null; }
-  else if (a === 'tab') { S.tab = id; S.detailId = null; S.edit = null; S.msg = null; S.form = null; }
+  else if (a === 'confirmcontinue') return run(() => enter());
+  else if (a === 'tab') { S.tab = id; S.stack = []; S.detailId = null; S.edit = null; S.draft = null; S.msg = null; S.form = null; }
   else if (a === 'filter') S.filter = id;
-  else if (a === 'open') { S.edit = null; S.detailId = id; S.msg = null; S.form = null; window.scrollTo(0, 0); }
-  else if (a === 'back') { if (S.edit && S.edit.kind === 'order' && S.edit.id) S.edit = null; else { S.edit = null; S.detailId = null; } S.msg = null; S.form = null; }
-  else if (a === 'neworder') { S.edit = { kind: 'order', id: null, date: id || '' }; S.msg = null; window.scrollTo(0, 0); }
-  else if (a === 'editorder') { S.edit = { kind: 'order', id: S.detailId }; S.msg = null; }
-  else if (a === 'newcontractor') { S.edit = { kind: 'contractor', id: null }; S.msg = null; }
-  else if (a === 'opencontractor') { S.edit = { kind: 'contractor', id }; S.msg = null; window.scrollTo(0, 0); }
+  else if (a === 'cview') { S.cview = id; S.msg = null; }
+  else if (a === 'open') go(null, id);
+  else if (a === 'openinvoice') go({ kind: 'invoice', mode: 'view' }, id);
+  else if (a === 'editinvoice') { if (cur) { go({ kind: 'invoice', mode: 'edit' }, cur.id, S.edit && S.edit.kind === 'invoice'); S.draft = invoiceDraft(cur); } }
+  else if (a === 'back') back();
+  else if (a === 'neworder') { go({ kind: 'order', id: null }); S.draft = orderDraft(null, b.dataset.cid, b.dataset.date); }
+  else if (a === 'editorder') { if (cur) { go({ kind: 'order', id: cur.id }, cur.id); S.draft = orderDraft(cur); } }
+  else if (a === 'newcontractor') go({ kind: 'contractor', id: null });
+  else if (a === 'opencontractor') { go({ kind: 'contractor', id }); S.cview = 'jobs'; }
+  else if (a === 'newsaved') go({ kind: 'saved', id: null, cid: S.edit.id });
+  else if (a === 'opensaved') go({ kind: 'saved', id, cid: S.edit.id });
+  else if (a === 'delsaved') return run(async () => { await api.deleteItem(S.edit.id); await api.loadData(); back(); }, 'Deleted from the price list.');
+  else if (a === 'addline') S.draft.lines.push(blankLine());
+  else if (a === 'rmline') { S.draft.lines.splice(Number(id), 1); if (!S.draft.lines.length) S.draft.lines.push(blankLine()); }
+  else if (a === 'calcpay') {
+    const ls = S.draft.lines.filter(l => String(l.desc).trim()); let n = 0, total = 0;
+    ls.forEach(l => { const s = priceFor(S.draft.contractor_id, l.desc); if (s && parseQty(l.qty) != null) { n++; total += lineCents({ rate: (cents(s.rate) / 100).toFixed(2), qty: l.qty }); } });
+    if (n) { S.draft.pay = (total / 100).toFixed(2); flash(n === ls.length ? 'good' : 'note', 'Priced ' + n + ' of ' + ls.length + ' lines from your price list: ' + money(total) + '.' + (n < ls.length ? ' The rest have no saved rate or no quantity.' : '')); }
+    else flash('note', 'No lines match your price list yet. Lines need a quantity and the same item name as a saved item.');
+  }
+  else if (a === 'print') { window.print(); return; }
   else if (a === 'calnav') { const d = new Date(S.cal.y, S.cal.m + Number(id), 1); S.cal = { y: d.getFullYear(), m: d.getMonth() }; S.calDay = null; }
   else if (a === 'calday') S.calDay = S.calDay === id ? null : id;
   else if (a === 'decline') S.form = { declining: true };
@@ -609,7 +830,7 @@ document.addEventListener('click', ev => {
   else if (a === 'linkcode') return run(async () => { await api.createLinkCode(S.edit.id); await api.loadData(); }, 'Link code created.');
   else if (a === 'unlink') return run(async () => { await api.revokeLink(S.edit.id); await api.loadData(); }, 'Unlinked. The old code or connection no longer works.');
   else if (a === 'reload') return run(() => api.loadData());
-  else if (a === 'signout') { api.signOut(); S.view = 'auth'; S.authMode = 'signin'; S.detailId = null; S.edit = null; S.msg = null; S.profile = null; S.search = ''; S.tab = 'orders'; S.filter = 'open'; S.calDay = null; S.form = null; }
+  else if (a === 'signout') { api.signOut(); Object.assign(S, { view: 'auth', authMode: 'signin', detailId: null, edit: null, draft: null, stack: [], msg: null, profile: null, search: '', filter: 'open', calDay: null, form: null }); }
   render();
 });
 
@@ -620,11 +841,10 @@ document.addEventListener('click', ev => {
     const hp = new URLSearchParams(location.hash.replace(/^#/, ''));
     if (hp.get('access_token') || hp.get('error_description')) {      // came back from an email link
       history.replaceState(null, '', location.pathname + location.search);
-      if (hp.get('error_description')) { S.view = 'auth'; flash('err', hp.get('error_description') + '. Ask for a new link.'); render(); return; }
+      if (hp.get('error_description')) { S.view = 'auth'; flash('err', hp.get('error_description') + '. Sign in, or ask for a new link.'); render(); return; }
       try {
         await api.sessionFromLink(hp);
-        if (hp.get('type') === 'recovery') { S.view = 'auth'; S.authMode = 'newpw'; render(); return; }
-        await enter(); render(); return;
+        S.view = 'auth'; S.authMode = hp.get('type') === 'recovery' ? 'newpw' : 'confirmed'; render(); return;
       } catch (e) { saveSession(null); S.view = 'auth'; flash('err', errText(e)); render(); return; }
     }
     const s = loadSession();
@@ -633,7 +853,7 @@ document.addEventListener('click', ev => {
       try { await enter(); render(); return; }
       catch (e) { if (e.code === 'not_authenticated') saveSession(null); else { S.view = 'auth'; flash('err', errText(e)); render(); return; } }
     }
-  }
+  } else if (/[?&]screen=confirmed\b/.test(location.search)) { S.session = { user: { id: 'demo', email: 'you@example.com' } }; S.view = 'auth'; S.authMode = 'confirmed'; render(); return; }
   S.view = 'auth'; render();
 })();
 </script>
