@@ -32,7 +32,14 @@ button.card{display:block;width:100%;text-align:left;cursor:pointer}
 .row{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
 .title{font-weight:650;font-size:16px}
 .mut{color:var(--mut);font-size:14px}
-.pill{display:inline-block;font-size:12px;font-weight:650;padding:3px 9px;border-radius:99px;white-space:nowrap}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal .dow{text-align:center;font-size:11px;color:var(--mut);padding-bottom:2px}
+.cd{aspect-ratio:1;border:1px solid var(--line);background:#fff;border-radius:8px;position:relative;cursor:pointer;font-size:14px;padding:0 0 8px}
+.cd.has{font-weight:700;border-color:var(--navy)}
+.cd.today{background:#fff4d6}
+.cd.sel{background:var(--navy);color:#fff;border-color:var(--navy)}
+.cd i{position:absolute;bottom:3px;left:50%;transform:translateX(-50%);font-style:normal;font-size:10px;font-weight:700;line-height:14px;background:var(--acc);color:#3b2500;border-radius:99px;padding:0 5px}
+.pill{background:#eef1f6;color:#344054;display:inline-block;font-size:12px;font-weight:650;padding:3px 9px;border-radius:99px;white-space:nowrap}
 .s-sent{background:#fef3c7;color:#92400e}.s-accepted{background:#dbeafe;color:#1e40af}.s-complete{background:#dcfce7;color:#166534}
 .s-declined,.s-cancelled,.s-rejected{background:#fee4e2;color:#912018}.s-submitted{background:#fef3c7;color:#92400e}.s-approved{background:#dbeafe;color:#1e40af}.s-paid{background:#dcfce7;color:#166534}
 .chips{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
@@ -80,23 +87,25 @@ td.n,th.n{text-align:right;white-space:nowrap}
    link a contractor: the sub creates a link code, the contractor enters it
    in their system (e.g. Better View Pro), and work orders arrive on their own.
 
-   CONFIG — paste the URL and anon key of the sub app's Supabase project.
-   While either is blank the app runs in DEMO MODE on fake in-memory data.
-   Add ?demo=1 to the URL to force demo mode after going live.
+   Add ?demo=1 to the URL to open DEMO MODE (fake in-memory data, nothing saved).
    ===================================================================== */
 const APP_NAME = 'Sub Portal';           // working title — product name not chosen yet
-const SB_URL   = '';                      // e.g. https://<project-ref>.supabase.co
-const SB_KEY   = '';                      // anon (public) key
+const SB_URL   = 'https://uirtgwirsaddtolzahjx.supabase.co';
+const SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpcnRnd2lyc2FkZHRvbHphaGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU2MzY5MDcsImV4cCI6MjExMTIxMjkwN30.JaLclDcIKkuzdtSpI8sBRmnx5nSbP_tuem2lUfj8XH4'; // anon (public) key
 const PHOTO_BUCKET = 'wo-photos';
 const MGMT_ROLES = ['owner', 'manager', 'project_manager'];
 const BILLING_ROLES = ['owner', 'manager'];
+const ROLE_LABEL = { owner: 'Owner', manager: 'Manager', project_manager: 'Project manager', laborer: 'Crew' };
 const SESSION_KEY = 'subapp_session_v1';
-const PENDING_KEY = 'subapp_pending_company_v1';
+const PENDING_KEY = 'subapp_pending_v2';
 const CONTRACTOR_COLS = 'id,company_id,name,contact_name,phone,email,notes,link_status,link_code,link_code_expires,linked_name,linked_at';
 const DEMO = !SB_URL || !SB_KEY || /[?&]demo=1\b/.test(location.search);
+const SITE_URL = location.origin + location.pathname;
 
-const S = { view: 'loading', authMode: 'signin', tab: 'orders', filter: 'open', detailId: null, edit: null,
-  session: null, profile: null, company: null, orders: [], pays: [], contractors: [],
+const NOW = new Date();
+const S = { view: 'loading', authMode: 'signin', tab: 'orders', filter: 'open', search: '', detailId: null, edit: null,
+  cal: { y: NOW.getFullYear(), m: NOW.getMonth() }, calDay: null,
+  session: null, profile: null, company: null, orders: [], pays: [], contractors: [], team: [], invites: [],
   msg: null, busy: false, form: null };
 
 /* ---------- helpers ---------- */
@@ -111,6 +120,8 @@ function parseMoney(str, allowZero) {   // deterministic: digits, optional 1-2 d
   const c = parseInt(d, 10) * 100 + parseInt((f + '00').slice(0, 2), 10);
   return c > 0 || allowZero ? c : null;
 }
+const ymd = (y, m, d) => y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return ymd(d.getFullYear(), d.getMonth(), d.getDate()); };
 function fmtDate(d) {
   if (!d) return 'No date set';
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d); if (!m) return String(d);
@@ -133,6 +144,10 @@ const ERR = {
   not_allowed: 'Your role does not allow this. Ask the company owner.',
   already_has_company: 'This login already belongs to a company.',
   company_name_required: 'Enter your company name.',
+  display_name_required: 'Enter your name.',
+  invalid_team_code: 'That join code was not found, was already used, or has expired.',
+  role_invalid: 'Pick a role.',
+  cannot_change_self: 'You cannot change your own role or remove yourself.',
   name_required: 'Enter the contractor name.',
   title_required: 'Enter a title for the work order.',
   amount_invalid: 'Enter a pay amount like 1250 or 1250.00.',
@@ -147,7 +162,10 @@ const ERR = {
   work_order_not_complete: 'Mark the work order complete before billing.',
   already_submitted: 'A pay request was already submitted for this work order.',
   not_found_or_linked: 'Payment status on a linked work order is set by the contractor.',
-  '42501': 'Permission denied. Sign out and back in, then try again.'
+  '42501': 'Permission denied. Sign out and back in, then try again.',
+  PGRST202: 'The database is not set up yet. Run the latest setup SQL, then try again.',
+  PGRST205: 'The database is not set up yet. Run the latest setup SQL, then try again.',
+  '42P01': 'The database is not set up yet. Run the latest setup SQL, then try again.'
 };
 const errText = e => ERR[e && e.code] || (e && e.message) || 'Something went wrong. Try again.';
 function appErr(code, message) { const e = new Error(message || code); e.code = code; return e; }
@@ -155,11 +173,13 @@ function appErr(code, message) { const e = new Error(message || code); e.code = 
 /* ---------- Supabase REST (no SDK) ---------- */
 function saveSession(s) { S.session = s; try { s ? localStorage.setItem(SESSION_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSION_KEY); } catch (_) {} }
 function loadSession() { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (_) { return null; } }
-function toSession(j) { return { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Math.floor(Date.now() / 1000) + (j.expires_in || 3600), user: { id: j.user.id, email: j.user.email } }; }
+function getPending() { try { return JSON.parse(localStorage.getItem(PENDING_KEY) || 'null'); } catch (_) { return null; } }
+function setPending(p) { try { p ? localStorage.setItem(PENDING_KEY, JSON.stringify(p)) : localStorage.removeItem(PENDING_KEY); } catch (_) {} }
+function toSession(j) { return { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Math.floor(Date.now() / 1000) + (Number(j.expires_in) || 3600), user: { id: j.user.id, email: j.user.email } }; }
 async function authCall(path, body) {
   const r = await fetch(SB_URL + '/auth/v1/' + path, { method: 'POST', headers: { apikey: SB_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw appErr('auth', j.error_description || j.msg || j.message || 'Sign-in failed.');
+  if (!r.ok) throw appErr('auth', j.error_description || j.msg || j.message || 'That did not work. Check your details and try again.');
   return j;
 }
 async function refreshSession() {
@@ -176,11 +196,11 @@ const sb = {
     const r = await fetch(SB_URL + path, { method: opt.method || 'GET', headers, body });
     if (r.status === 401 && !retried) { await refreshSession(); return sb.req(path, opt, true); }
     const text = await r.text(); let j = null; try { j = text ? JSON.parse(text) : null; } catch (_) {}
-    if (!r.ok) throw appErr((j && j.code) || 'http_' + r.status, (j && (j.message || j.error)) || ('Request failed (' + r.status + ').'));
+    if (!r.ok) throw appErr((j && j.code) || 'http_' + r.status, (j && (j.message || j.msg || j.error)) || ('Request failed (' + r.status + ').'));
     return j;
   },
   async rpc(name, args) {
-    const j = await sb.req('/rest/v1/rpc/' + name, { method: 'POST', body: args });
+    const j = await sb.req('/rest/v1/rpc/' + name, { method: 'POST', body: args || {} });
     if (j && j.error) throw appErr(j.error);
     return j;
   }
@@ -195,9 +215,16 @@ function photoUrl(p) {
 const live = {
   async signIn(email, password) { saveSession(toSession(await authCall('token?grant_type=password', { email, password }))); },
   async signUp(email, password) {
-    const j = await authCall('signup', { email, password });
+    const j = await authCall('signup?redirect_to=' + encodeURIComponent(SITE_URL), { email, password });
     if (j.access_token) { saveSession(toSession(j)); return true; }
-    return false;                       // email confirmation is on: user must confirm, then sign in
+    return false;                       // email confirmation is on: user confirms, the link brings them back signed in
+  },
+  recover: email => authCall('recover?redirect_to=' + encodeURIComponent(SITE_URL), { email }),
+  setPassword: password => sb.req('/auth/v1/user', { method: 'PUT', body: { password } }),
+  async sessionFromLink(p) {            // email confirmation and password reset links land here with tokens in the URL
+    S.session = { access_token: p.get('access_token'), refresh_token: p.get('refresh_token'), expires_at: Math.floor(Date.now() / 1000) + (Number(p.get('expires_in')) || 3600), user: {} };
+    const u = await sb.req('/auth/v1/user');
+    S.session.user = { id: u.id, email: u.email }; saveSession(S.session);
   },
   async loadProfile() {
     const rows = await sb.req('/rest/v1/profiles?select=*&id=eq.' + encodeURIComponent(S.session.user.id));
@@ -205,14 +232,28 @@ const live = {
     if (S.profile) { const c = await sb.req('/rest/v1/companies?select=*&id=eq.' + encodeURIComponent(S.profile.company_id)); S.company = c && c[0] || null; }
   },
   async loadData() {                    // RLS scopes every row to this company
-    const [o, p, c] = await Promise.all([
+    const team = sb.req('/rest/v1/profiles?select=id,role,display_name,email&order=display_name');
+    if (!isMgmt()) {                    // crew: accepted and completed jobs only, no pay
+      const [r, t] = await Promise.all([sb.rpc('crew_work_orders'), team]);
+      S.orders = r.work_orders || []; S.pays = []; S.contractors = []; S.invites = []; S.team = t || []; return;
+    }
+    const [o, p, c, t, i] = await Promise.all([
       sb.req('/rest/v1/work_orders?select=*'),
       sb.req('/rest/v1/pay_requests?select=*'),
-      sb.req('/rest/v1/contractors?select=' + CONTRACTOR_COLS + '&order=name')
+      sb.req('/rest/v1/contractors?select=' + CONTRACTOR_COLS + '&order=name'),
+      team,
+      canBill() ? sb.req('/rest/v1/team_invites?select=id,role,code,expires_at&used_at=is.null&order=created_at.desc') : []
     ]);
-    S.orders = o || []; S.pays = p || []; S.contractors = c || [];
+    S.orders = o || []; S.pays = p || []; S.contractors = c || []; S.team = t || [];
+    S.invites = (i || []).filter(x => new Date(x.expires_at) > new Date());
   },
   createCompany: (name, display) => sb.rpc('signup_create_company', { p_company_name: name, p_display_name: display }),
+  joinTeam: (code, display) => sb.rpc('team_join', { p_code: code, p_display_name: display }),
+  createInvite: r => sb.rpc('team_create_invite', { p_role: r }),
+  cancelInvite: id => sb.rpc('team_cancel_invite', { p_id: id }),
+  setRole: (uid, r) => sb.rpc('team_set_role', { p_user_id: uid, p_role: r }),
+  removeMember: uid => sb.rpc('team_remove_member', { p_user_id: uid }),
+  updateAccount: (company, display) => sb.rpc('account_update', { p_company_name: company || null, p_display_name: display }),
   saveContractor: (id, f) => sb.rpc('contractor_save', { p_id: id || null, p_name: f.name, p_contact_name: f.contact_name, p_phone: f.phone, p_email: f.email, p_notes: f.notes }),
   createLinkCode: id => sb.rpc('contractor_create_link_code', { p_id: id }),
   revokeLink: id => sb.rpc('contractor_revoke_link', { p_id: id }),
@@ -242,14 +283,13 @@ function toJpeg(file) {                  // downscale to max 1600px, JPEG
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
       c.toBlob(b => b ? res(b) : rej(appErr('photo', 'Could not read that photo.')), 'image/jpeg', 0.82);
     };
-    img.onerror = () => { URL.revokeObjectURL(url); rej(appErr('photo', 'Could not read that photo.')); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(appErr('photo', 'Could not read that photo. Try a JPG or PNG.')); };
     img.src = url;
   });
 }
 
 /* ---------- data layer (demo: fake data, same rules and error codes as the server functions) ---------- */
 const swatch = (label, color) => 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><rect width="300" height="300" fill="' + color + '"/><text x="150" y="158" font-family="sans-serif" font-size="22" fill="#fff" text-anchor="middle">' + label + '</text></svg>');
-const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 const demoDb = {
   contractors: [
     { id: 'c-1', name: 'Demo General Contracting', contact_name: 'Sample Contact', phone: '', email: '', notes: '', link_status: 'active', linked_name: 'Demo General Contracting' },
@@ -262,16 +302,31 @@ const demoDb = {
     { id: 'wo-4', contractor_id: 'c-2', source: 'manual', title: 'Soffit and fascia wrap', address: '12 Test Ct, Anytown, WI', scope: 'Wrap fascia in aluminum coil, install vented soffit on front elevation.', line_items: [{ desc: 'Vented soffit', qty: 60, unit: 'lf' }], photos: [], pay_amount: 1375.5, scheduled_date: day(-12), status: 'complete', completion_photos: [{ url: swatch('Completed', '#15803d'), caption: '' }] }
   ],
   pays: [{ id: 'pr-1', work_order_id: 'wo-4', amount: 1375.5, notes: '', status: 'submitted' }],
+  team: [{ id: 'demo', role: 'owner', display_name: 'Demo User', email: 'you@example.com' }, { id: 'm-2', role: 'laborer', display_name: 'Sample Crew', email: 'crew@example.com' }],
+  invites: [],
   user: null
 };
 const wait = () => new Promise(r => setTimeout(r, 120));
 const dOrder = id => demoDb.orders.find(x => x.id === id);
 const demo = {
-  async signIn() { await wait(); S.session = { user: { id: 'demo', email: 'you@example.com' } }; demoDb.user = demoDb.user || { company: 'Demo Subcontracting LLC', name: 'Demo User' }; },
+  async signIn() { await wait(); S.session = { user: { id: 'demo', email: 'you@example.com' } }; demoDb.user = demoDb.user || { company: 'Demo Subcontracting LLC', name: 'Demo User', role: 'owner' }; },
   async signUp() { await wait(); S.session = { user: { id: 'demo', email: 'you@example.com' } }; demoDb.user = null; return true; },
-  async loadProfile() { S.profile = demoDb.user ? { id: 'demo', company_id: 'demo-co', role: 'owner', display_name: demoDb.user.name } : null; S.company = demoDb.user ? { id: 'demo-co', name: demoDb.user.company } : null; },
-  async loadData() { await wait(); S.orders = demoDb.orders.map(o => ({ ...o })); S.pays = demoDb.pays.map(p => ({ ...p })); S.contractors = demoDb.contractors.map(c => ({ ...c })).sort((a, b) => a.name.localeCompare(b.name)); },
-  async createCompany(name, display) { if (!name) throw appErr('company_name_required'); demoDb.user = { company: name, name: display }; },
+  async recover() { await wait(); },
+  async setPassword() { await wait(); },
+  async loadProfile() { S.profile = demoDb.user ? { id: 'demo', company_id: 'demo-co', role: demoDb.user.role, display_name: demoDb.user.name } : null; S.company = demoDb.user ? { id: 'demo-co', name: demoDb.user.company } : null; },
+  async loadData() {
+    await wait(); const me = demoDb.team.find(t => t.id === 'demo'); me.role = demoDb.user.role; me.display_name = demoDb.user.name;
+    S.team = demoDb.team.map(t => ({ ...t })); S.invites = demoDb.invites.map(i => ({ ...i }));
+    if (!isMgmt()) { S.orders = demoDb.orders.filter(o => o.status === 'accepted' || o.status === 'complete').map(o => { const c = { ...o, contractor_name: (demoDb.contractors.find(x => x.id === o.contractor_id) || {}).name }; delete c.pay_amount; return c; }); S.pays = []; S.contractors = []; S.invites = []; return; }
+    S.orders = demoDb.orders.map(o => ({ ...o })); S.pays = demoDb.pays.map(p => ({ ...p })); S.contractors = demoDb.contractors.map(c => ({ ...c })).sort((a, b) => a.name.localeCompare(b.name));
+  },
+  async createCompany(name, display) { if (!name) throw appErr('company_name_required'); demoDb.user = { company: name, name: display, role: 'owner' }; },
+  async joinTeam(code, display) { await wait(); if (!code) throw appErr('invalid_team_code'); demoDb.user = { company: 'Demo Subcontracting LLC', name: display || 'Crew Member', role: 'laborer' }; },
+  async createInvite(r) { await wait(); if (!['manager', 'project_manager', 'laborer'].includes(r)) throw appErr('role_invalid'); demoDb.invites.unshift({ id: uuid(), role: r, code: uuid().replace(/-/g, '').slice(0, 10).toUpperCase(), expires_at: day(7) }); },
+  async cancelInvite(id) { await wait(); demoDb.invites = demoDb.invites.filter(i => i.id !== id); },
+  async setRole(uid, r) { await wait(); const t = demoDb.team.find(x => x.id === uid); if (!t || t.role === 'owner') throw appErr('not_found'); t.role = r; },
+  async removeMember(uid) { await wait(); if (uid === 'demo') throw appErr('cannot_change_self'); demoDb.team = demoDb.team.filter(x => x.id !== uid); },
+  async updateAccount(company, display) { await wait(); if (!display) throw appErr('display_name_required'); demoDb.user.name = display; if (demoDb.user.role === 'owner') { if (!company) throw appErr('company_name_required'); demoDb.user.company = company; } },
   async saveContractor(id, f) { await wait(); if (!f.name) throw appErr('name_required'); const c = demoDb.contractors.find(x => x.id === id); if (c) Object.assign(c, f); else demoDb.contractors.push(Object.assign({ id: uuid(), link_status: 'manual' }, f)); },
   async createLinkCode(id) { await wait(); const c = demoDb.contractors.find(x => x.id === id); if (!c) throw appErr('not_found'); if (c.link_status === 'active') throw appErr('already_linked'); c.link_status = 'pending'; c.link_code = uuid().replace(/-/g, '').slice(0, 10).toUpperCase(); c.link_code_expires = day(7); },
   async revokeLink(id) { await wait(); const c = demoDb.contractors.find(x => x.id === id); if (!c || !['pending', 'active'].includes(c.link_status)) throw appErr('not_found'); c.link_status = 'revoked'; c.link_code = null; },
@@ -287,65 +342,92 @@ const api = DEMO ? demo : live;
 
 /* ---------- derived ---------- */
 const role = () => S.profile && S.profile.role;
+const isMgmt = () => MGMT_ROLES.includes(role());
 const canBill = () => BILLING_ROLES.includes(role());
 const payFor = id => S.pays.find(p => p.work_order_id === id) || null;
 const contractor = id => S.contractors.find(c => c.id === id) || null;
-const gcName = o => { const c = contractor(o.contractor_id); return c ? c.name : ''; };
+const gcName = o => { const c = contractor(o.contractor_id); return c ? c.name : (o.contractor_name || ''); };
 const byDate = (a, b) => String(a.scheduled_date || '9999').localeCompare(String(b.scheduled_date || '9999'));
+const TABS = () => isMgmt()
+  ? [['orders', '▤', 'Work orders'], ['schedule', '◷', 'Schedule'], ['billing', '$', 'Billing'], ['contractors', '⚑', 'Contractors'], ['account', '☰', 'Account']]
+  : [['orders', '▤', 'Jobs'], ['schedule', '◷', 'Schedule'], ['account', '☰', 'Account']];
 
 /* ---------- views ---------- */
 const msgHtml = () => S.msg ? '<div class="msg ' + S.msg.kind + '" role="status">' + esc(S.msg.text) + '</div>' : '';
 const demoBar = () => DEMO ? '<div class="demo">DEMO MODE — sample data, nothing is saved</div>' : '';
 const dis = () => S.busy ? ' disabled' : '';
 const field = (id, name, label, val, extra) => '<label for="' + id + '">' + label + '</label><input id="' + id + '" name="' + name + '" value="' + esc(val) + '" ' + (extra || '') + '>';
+const roleOptions = (sel, list) => list.map(r => '<option value="' + r + '"' + (sel === r ? ' selected' : '') + '>' + ROLE_LABEL[r] + '</option>').join('');
 
 function viewAuth() {
-  const up = S.authMode === 'signup';
-  return demoBar() + '<main><div class="auth"><h1>' + esc(APP_NAME) + '</h1><p class="mut">Work orders, scheduling and billing for subcontractors.</p>' + msgHtml() +
-    '<form data-form="' + (up ? 'signup' : 'signin') + '" class="card">' +
-    field('em', 'email', 'Email', DEMO ? 'you@example.com' : '', 'type="email" autocomplete="email" required') +
-    field('pw', 'password', 'Password', DEMO ? 'demo-only' : '', 'type="password" required minlength="6" autocomplete="' + (up ? 'new-password' : 'current-password') + '"') +
-    (up ? field('cn', 'company', 'Company name', '', 'required') + field('dn', 'display', 'Your name', '', 'required') : '') +
-    '<button class="btn"' + dis() + '>' + (up ? 'Create account' : 'Sign in') + '</button></form>' +
-    '<button class="link" data-act="authmode">' + (up ? 'Have an account? Sign in' : 'New here? Create an account') + '</button></div></main>';
+  const m = S.authMode, d = DEMO;
+  const email = field('em', 'email', 'Email', d ? 'you@example.com' : '', 'type="email" autocomplete="email" required');
+  const pw = n => field('pw', 'password', n ? 'New password' : 'Password', d ? 'demo-only' : '', 'type="password" required minlength="6" autocomplete="' + (m === 'signin' ? 'current-password' : 'new-password') + '"');
+  let form, links;
+  if (m === 'signup') { form = '<form data-form="signup" class="card">' + email + pw() + field('cn', 'company', 'Company name', '', 'required') + field('dn', 'display', 'Your name', '', 'required') + '<button class="btn"' + dis() + '>Create company account</button></form>'; }
+  else if (m === 'join') { form = '<form data-form="joinsignup" class="card"><p class="mut" style="margin:0">Your owner or manager gives you a join code from their Account screen.</p>' + field('jc', 'code', 'Join code', '', 'required autocapitalize="characters" autocomplete="off"') + field('dn', 'display', 'Your name', '', 'required') + email + pw() + '<button class="btn"' + dis() + '>Join my company</button></form>'; }
+  else if (m === 'forgot') { form = '<form data-form="forgot" class="card"><p class="mut" style="margin:0">We will email you a link to set a new password.</p>' + email + '<button class="btn"' + dis() + '>Send reset link</button></form>'; }
+  else if (m === 'newpw') { form = '<form data-form="newpw" class="card"><p class="mut" style="margin:0">Choose a new password for ' + esc(S.session && S.session.user.email) + '.</p>' + pw(true) + '<button class="btn"' + dis() + '>Save password</button></form>'; }
+  else { form = '<form data-form="signin" class="card">' + email + pw() + '<button class="btn"' + dis() + '>Sign in</button></form>'; }
+  const link = (mode, t) => '<button class="link" data-act="authmode" data-id="' + mode + '">' + t + '</button>';
+  links = m === 'signin' ? link('signup', 'Start a new company account') + '<br>' + link('join', 'Join your company with a code') + '<br>' + link('forgot', 'Forgot password?') : m === 'newpw' ? '' : link('signin', 'Back to sign in');
+  return demoBar() + '<main><div class="auth"><h1>' + esc(APP_NAME) + '</h1><p class="mut">Work orders, scheduling and billing for subcontractors.</p>' + msgHtml() + form + links + '</div></main>';
 }
 function viewOnboard() {
   const p = S.form || {};
-  return demoBar() + '<main><div class="auth"><h1>Set up your company</h1><p class="mut">Signed in as ' + esc(S.session.user.email) + '</p>' + msgHtml() +
-    '<form data-form="company" class="card">' + field('cn', 'company', 'Company name', p.company, 'required') + field('dn', 'display', 'Your name', p.display, 'required') +
-    '<button class="btn"' + dis() + '>Create company</button></form><button class="link" data-act="signout">Sign out</button></div></main>';
-}
-function viewBlocked(text) {
-  return demoBar() + '<main><div class="auth"><h1>' + esc(APP_NAME) + '</h1><div class="msg note">' + esc(text) + '</div><button class="btn ghost" data-act="signout">Sign out</button></div></main>';
+  return demoBar() + '<main><div class="auth"><h1>Finish setting up</h1><p class="mut">Signed in as ' + esc(S.session.user.email) + '. This login is not part of a company yet.</p>' + msgHtml() +
+    '<form data-form="company" class="card"><div class="title">Start a new company</div>' + field('cn', 'company', 'Company name', p.company, 'required') + field('dn', 'display', 'Your name', p.display, 'required') + '<button class="btn"' + dis() + '>Create company</button></form>' +
+    '<form data-form="join" class="card"><div class="title">Or join your company</div>' + field('jc', 'code', 'Join code', p.code, 'required autocapitalize="characters" autocomplete="off"') + field('dn2', 'display', 'Your name', p.display, 'required') + '<button class="btn ghost"' + dis() + '>Join</button></form>' +
+    '<button class="link" data-act="signout">Sign out</button></div></main>';
 }
 function orderCard(o) {
   const pr = payFor(o.id);
   return '<button class="card" data-act="open" data-id="' + esc(o.id) + '"><div class="row"><div><div class="title">' + esc(o.title || 'Work order') + '</div><div class="mut">' + esc(o.address) + '</div><div class="mut">' + esc(fmtDate(o.scheduled_date)) + (gcName(o) ? ' · ' + esc(gcName(o)) : '') + '</div></div>' +
     '<div style="text-align:right"><span class="pill s-' + esc(o.status) + '">' + esc(ORDER_LABEL[o.status] || o.status) + '</span>' + (pr ? '<div style="margin-top:6px"><span class="pill s-' + esc(pr.status) + '">' + esc(PAY_LABEL[pr.status] || pr.status) + '</span></div>' : '') + '</div></div></button>';
 }
+function orderListHtml() {
+  const f = S.filter, q = S.search.trim().toLowerCase();
+  const list = S.orders.filter(o => f === 'all' || (f === 'open' ? (o.status === 'sent' || o.status === 'accepted') : o.status === 'complete'))
+    .filter(o => !q || [o.title, o.address, o.scope, gcName(o)].some(v => String(v || '').toLowerCase().includes(q))).sort(byDate);
+  return list.length ? list.map(orderCard).join('') : '<div class="empty">' + (q ? 'Nothing matches that search.' : isMgmt() ? 'No work orders here.<br>Add one yourself, or link a contractor so they can send them.' : 'No jobs here right now.') + '</div>';
+}
 function viewOrders() {
-  const f = S.filter, list = S.orders.filter(o => f === 'all' || (f === 'open' ? (o.status === 'sent' || o.status === 'accepted') : o.status === 'complete')).sort(byDate);
+  const f = S.filter;
   const chip = (k, t) => '<button data-act="filter" data-id="' + k + '" class="' + (f === k ? 'on' : '') + '" aria-pressed="' + (f === k) + '">' + t + '</button>';
   return '<div class="chips">' + chip('open', 'Open') + chip('done', 'Complete') + chip('all', 'All') + '</div>' + msgHtml() +
-    '<button class="btn ghost" style="margin:0 0 12px" data-act="neworder">+ New work order</button>' +
-    (list.length ? list.map(orderCard).join('') : '<div class="empty">No work orders here.<br>Add one yourself, or link a contractor so they can send them.</div>');
+    '<input id="q" type="search" placeholder="Search title, address, contractor" aria-label="Search work orders" value="' + esc(S.search) + '" style="margin-bottom:12px">' +
+    (isMgmt() ? '<button class="btn ghost" style="margin:0 0 12px" data-act="neworder">+ New work order</button>' : '') +
+    '<div id="olist">' + orderListHtml() + '</div>';
 }
 function viewOrderForm() {
   const o = S.edit.id ? S.orders.find(x => x.id === S.edit.id) || {} : {};
   return msgHtml() + '<form data-form="order" class="card">' + field('ot', 'title', 'Title', o.title, 'required') +
     '<label for="oc">Contractor</label><select id="oc" name="contractor_id"><option value="">None</option>' + S.contractors.map(c => '<option value="' + esc(c.id) + '"' + (o.contractor_id === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') + '</select>' +
-    field('oa', 'address', 'Job address', o.address, 'autocomplete="off"') + field('od', 'scheduled_date', 'Scheduled date', o.scheduled_date, 'type="date"') +
+    field('oa', 'address', 'Job address', o.address, 'autocomplete="off"') + field('od', 'scheduled_date', 'Scheduled date', o.scheduled_date || (S.edit.date || ''), 'type="date"') +
     field('op', 'pay', 'Your pay for this job', o.pay_amount != null ? (cents(o.pay_amount) / 100).toFixed(2) : '', 'inputmode="decimal" required') +
     '<label for="os">Scope</label><textarea id="os" name="scope">' + esc(o.scope) + '</textarea>' +
     '<label for="oi">Line items, one per line</label><textarea id="oi" name="items" placeholder="24 sq Tear-off, 1 layer">' + esc(itemsText(o.line_items)) + '</textarea><div class="mut">Start a line with quantity and unit, like "24 sq", or just type the item.</div>' +
     '<button class="btn"' + dis() + '>Save work order</button></form>';
 }
 function viewSchedule() {
-  const list = S.orders.filter(o => o.status === 'sent' || o.status === 'accepted').sort(byDate);
-  if (!list.length) return '<div class="empty">Nothing scheduled.</div>';
-  let out = '', last = null;
-  for (const o of list) { const d = fmtDate(o.scheduled_date); if (d !== last) { out += '<h2>' + esc(d) + '</h2>'; last = d; } out += orderCard(o); }
-  return msgHtml() + out;
+  const { y, m } = S.cal, first = new Date(y, m, 1), lead = first.getDay(), days = new Date(y, m + 1, 0).getDate(), today = day(0);
+  const by = {};
+  S.orders.filter(o => ['sent', 'accepted', 'complete'].includes(o.status) && o.scheduled_date).forEach(o => { const k = String(o.scheduled_date).slice(0, 10); (by[k] = by[k] || []).push(o); });
+  let cells = ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => '<div class="dow" aria-hidden="true">' + d + '</div>').join('') + '<div></div>'.repeat(lead);
+  for (let d = 1; d <= days; d++) {
+    const k = ymd(y, m, d), n = (by[k] || []).length;
+    cells += '<button class="cd' + (n ? ' has' : '') + (k === today ? ' today' : '') + (k === S.calDay ? ' sel' : '') + '" data-act="calday" data-id="' + k + '" aria-label="' + esc(fmtDate(k)) + (n ? ', ' + n + ' job' + (n > 1 ? 's' : '') : '') + '">' + d + (n ? '<i>' + n + '</i>' : '') + '</button>';
+  }
+  let below;
+  if (S.calDay) {
+    const list = by[S.calDay] || [];
+    below = '<h2>' + esc(fmtDate(S.calDay)) + '</h2>' + (list.length ? list.map(orderCard).join('') : '<div class="mut" style="padding:4px 2px 10px">Nothing on this day.</div>') +
+      (isMgmt() ? '<button class="btn ghost" data-act="neworder" data-id="' + S.calDay + '">+ New work order on this day</button>' : '');
+  } else {
+    const open = S.orders.filter(o => o.status === 'sent' || o.status === 'accepted').sort(byDate);
+    below = '<h2>Coming up</h2>' + (open.length ? open.map(orderCard).join('') : '<div class="mut" style="padding:4px 2px">Nothing scheduled.</div>');
+  }
+  return msgHtml() + '<div class="card"><div class="row" style="align-items:center;margin-bottom:8px"><button class="link" data-act="calnav" data-id="-1" aria-label="Previous month">‹ Prev</button><div class="title">' + esc(first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })) + '</div><button class="link" data-act="calnav" data-id="1" aria-label="Next month">Next ›</button></div><div class="cal">' + cells + '</div></div>' + below;
 }
 function viewBilling() {
   const sum = st => S.pays.reduce((t, p) => t + (p.status === st ? cents(p.amount) : 0), 0);
@@ -362,25 +444,43 @@ function viewContractors() {
 }
 function viewContractorForm() {
   const c = S.edit.id ? contractor(S.edit.id) || {} : {};
-  let link = '';
+  let link = '', jobs = '';
   if (c.id) {
     if (c.link_status === 'active') link = '<div class="card"><div class="title">Linked' + (c.linked_name ? ' to ' + esc(c.linked_name) : '') + '</div><p class="mut">This contractor can send work orders straight into your account and sees your responses, completion photos and pay requests.</p><button class="btn bad" data-act="unlink"' + dis() + '>Unlink</button></div>';
     else if (c.link_status === 'pending' && c.link_code) link = '<div class="card"><div class="title">Link code</div><div class="pay" style="letter-spacing:.12em;margin:6px 0">' + esc(c.link_code) + '</div><p class="mut">Give this code to your contractor. They enter it in their system (for example Better View Pro). It works once and expires ' + esc(fmtDate(String(c.link_code_expires || '').slice(0, 10))) + '.</p><div class="two"><button class="btn bad" data-act="unlink"' + dis() + '>Cancel code</button><button class="btn ghost" data-act="reload"' + dis() + '>Check status</button></div></div>';
     else link = '<div class="card"><div class="title">Link this contractor</div><p class="mut">If this contractor uses Better View Pro, linking lets them send work orders straight to you. You create a code and give it to them.</p>' + (canBill() ? '<button class="btn" data-act="linkcode"' + dis() + '>Create link code</button>' : '<div class="mut">Only the owner or a manager can link.</div>') + '</div>';
+    const list = S.orders.filter(o => o.contractor_id === c.id).sort(byDate);
+    jobs = '<h2>Work orders</h2>' + (list.length ? list.map(orderCard).join('') : '<div class="mut" style="padding:4px 2px">None yet.</div>');
   }
   return msgHtml() + '<form data-form="contractor" class="card">' + field('kn', 'name', 'Contractor name', c.name, 'required') + field('kc', 'contact_name', 'Contact person', c.contact_name) +
     field('kp', 'phone', 'Phone', c.phone, 'type="tel"') + field('ke', 'email', 'Email', c.email, 'type="email"') +
-    '<label for="ko">Notes</label><textarea id="ko" name="notes">' + esc(c.notes) + '</textarea><button class="btn"' + dis() + '>Save contractor</button></form>' + link;
+    '<label for="ko">Notes</label><textarea id="ko" name="notes">' + esc(c.notes) + '</textarea><button class="btn"' + dis() + '>Save contractor</button></form>' + link + jobs;
 }
 function viewAccount() {
-  return msgHtml() + '<div class="card"><div class="title">' + esc(S.company && S.company.name || 'Your company') + '</div><div class="mut">' + esc(S.profile.display_name || '') + ' · ' + esc(String(role() || '').replace('_', ' ')) + '</div><div class="mut">' + esc(S.session.user.email) + '</div></div>' +
+  const owner = role() === 'owner', me = S.session.user.id;
+  let team = '';
+  if (isMgmt()) {
+    team = '<h2>Team</h2><div class="card">' + S.team.map(t => {
+      const editable = owner && t.id !== me && t.role !== 'owner';
+      return '<div class="row" style="align-items:center;padding:8px 0;border-bottom:1px solid var(--line)"><div><div class="title">' + esc(t.display_name || t.email || 'Member') + (t.id === me ? ' (you)' : '') + '</div><div class="mut">' + esc(t.email || '') + '</div></div>' +
+        (editable ? '<div style="text-align:right"><select data-change="setrole" data-id="' + esc(t.id) + '" aria-label="Role for ' + esc(t.display_name || t.email) + '" style="width:auto;padding:7px">' + roleOptions(t.role, ['manager', 'project_manager', 'laborer']) + '</select>' +
+          (S.form && S.form.removing === t.id ? '<div><button class="link" style="color:var(--bad)" data-act="removeyes" data-id="' + esc(t.id) + '">Confirm remove</button></div>' : '<div><button class="link" data-act="remove" data-id="' + esc(t.id) + '">Remove</button></div>') + '</div>'
+          : '<span class="pill">' + esc(ROLE_LABEL[t.role] || t.role) + '</span>') + '</div>';
+    }).join('') +
+      (canBill() ? '<form data-form="invite"><label for="ir">Add a team member</label><select id="ir" name="role">' + roleOptions('laborer', owner ? ['laborer', 'project_manager', 'manager'] : ['laborer', 'project_manager']) + '</select><div class="mut" style="margin-top:6px">Crew see scheduled jobs and can mark them complete with photos. They never see pay. Project managers see everything but cannot bill. Managers can also bill and link contractors.</div><button class="btn ghost"' + dis() + '>Create join code</button></form>' : '') + '</div>' +
+      (S.invites.length ? '<h2>Join codes waiting</h2>' + S.invites.map(i => '<div class="card"><div class="row" style="align-items:center"><div><div class="pay" style="letter-spacing:.1em;font-size:19px">' + esc(i.code) + '</div><div class="mut">' + esc(ROLE_LABEL[i.role]) + ' · expires ' + esc(fmtDate(String(i.expires_at).slice(0, 10))) + '</div></div><button class="link" data-act="cancelinvite" data-id="' + esc(i.id) + '">Cancel</button></div><div class="mut">They open this app, tap "Join your company with a code", and enter it.</div></div>').join('') : '');
+  }
+  return msgHtml() + '<form data-form="account" class="card">' +
+    (owner ? field('ac', 'company', 'Company name', S.company && S.company.name, 'required') : '<div class="title">' + esc(S.company && S.company.name || 'Your company') + '</div>') +
+    field('an', 'display', 'Your name', S.profile.display_name, 'required') +
+    '<div class="mut" style="margin-top:8px">' + esc(S.session.user.email) + ' · ' + esc(ROLE_LABEL[role()] || role()) + '</div><button class="btn ghost"' + dis() + '>Save</button></form>' + team +
     '<button class="btn ghost" data-act="signout">Sign out</button>';
 }
 function photoGrid(arr) {
   return '<div class="photos">' + arr.map(p => '<a href="' + esc(photoUrl(p)) + '" target="_blank" rel="noopener"><img loading="lazy" src="' + esc(photoUrl(p)) + '" alt="' + esc(p.caption || 'Job photo') + '"></a>').join('') + '</div>';
 }
 function viewDetail(o) {
-  const pr = payFor(o.id), manual = o.source === 'manual', items = Array.isArray(o.line_items) ? o.line_items : [], ph = Array.isArray(o.photos) ? o.photos : [], cph = Array.isArray(o.completion_photos) ? o.completion_photos : [];
+  const pr = payFor(o.id), mg = isMgmt(), manual = o.source === 'manual', items = Array.isArray(o.line_items) ? o.line_items : [], ph = Array.isArray(o.photos) ? o.photos : [], cph = Array.isArray(o.completion_photos) ? o.completion_photos : [];
   let act = '';
   if (o.status === 'sent') {
     act = '<div class="card"><div class="title">Respond to this date</div><div class="mut">' + esc(fmtDate(o.scheduled_date)) + '</div>' +
@@ -389,8 +489,8 @@ function viewDetail(o) {
   } else if (o.status === 'accepted') {
     act = '<form data-form="complete" class="card"><div class="title">Mark complete</div><label for="cp">Completion photos (at least one required)</label><input id="cp" name="photos" type="file" accept="image/*" multiple required>' +
       '<label for="nt">Notes (optional)</label><textarea id="nt" name="notes"></textarea><button class="btn ok"' + dis() + '>' + (S.busy ? 'Working…' : 'Mark complete') + '</button></form>' +
-      (manual ? '<div class="two" style="margin-bottom:12px"><button class="btn ghost" style="margin-top:0" data-act="editorder"' + dis() + '>Edit</button><button class="btn bad" style="margin-top:0" data-act="cancelorder"' + dis() + '>Cancel job</button></div>' : '');
-  } else if (o.status === 'complete') {
+      (mg && manual ? '<div class="two" style="margin-bottom:12px"><button class="btn ghost" style="margin-top:0" data-act="editorder"' + dis() + '>Edit</button><button class="btn bad" style="margin-top:0" data-act="cancelorder"' + dis() + '>Cancel job</button></div>' : '');
+  } else if (o.status === 'complete' && mg) {
     if (pr && pr.status !== 'rejected') {
       act = '<div class="card"><div class="row"><div><div class="title">Pay request</div><div class="pay">' + money(cents(pr.amount)) + '</div>' + (pr.notes ? '<div class="mut pre">' + esc(pr.notes) + '</div>' : '') + '</div><span class="pill s-' + esc(pr.status) + '">' + esc(PAY_LABEL[pr.status] || pr.status) + '</span></div>' +
         (manual && canBill() && pr.status !== 'paid' ? '<div class="two">' + (pr.status === 'submitted' ? '<button class="btn ghost" data-act="markpay" data-id="approved"' + dis() + '>Mark approved</button>' : '') + '<button class="btn ok" data-act="markpay" data-id="paid"' + dis() + '>Mark paid</button></div>'
@@ -402,7 +502,8 @@ function viewDetail(o) {
   }
   return msgHtml() + '<div class="card"><div class="row"><div><div class="title" style="font-size:19px">' + esc(o.title || 'Work order') + '</div>' + (gcName(o) ? '<div class="mut">' + (manual ? 'For ' : 'From ') + esc(gcName(o)) + '</div>' : '') + '</div><span class="pill s-' + esc(o.status) + '">' + esc(ORDER_LABEL[o.status] || o.status) + '</span></div>' +
     (o.address ? '<p style="margin:10px 0 2px"><a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(o.address) + '" target="_blank" rel="noopener">' + esc(o.address) + '</a></p>' : '') + '<div class="mut">' + esc(fmtDate(o.scheduled_date)) + '</div>' +
-    '<div style="margin-top:10px"><span class="mut">Your pay</span><div class="pay">' + money(cents(o.pay_amount)) + '</div></div></div>' + act +
+    (o.status === 'declined' && o.decline_reason ? '<div class="mut">Declined: ' + esc(o.decline_reason) + '</div>' : '') +
+    (mg ? '<div style="margin-top:10px"><span class="mut">Your pay</span><div class="pay">' + money(cents(o.pay_amount)) + '</div></div>' : '') + '</div>' + act +
     '<h2>Scope</h2><div class="card pre">' + (esc(o.scope) || '<span class="mut">No scope written.</span>') + '</div>' +
     (items.length ? '<h2>Line items</h2><div class="card"><table><thead><tr><th>Item</th><th class="n">Qty</th></tr></thead><tbody>' + items.map(i => '<tr><td>' + esc(i.desc) + '</td><td class="n">' + esc(i.qty) + ' ' + esc(i.unit) + '</td></tr>').join('') + '</tbody></table></div>' : '') +
     (ph.length ? '<h2>Job photos</h2><div class="card">' + photoGrid(ph) + '</div>' : '') +
@@ -413,12 +514,11 @@ function render() {
   if (S.view === 'loading') h = '<main><div class="empty">Loading…</div></main>';
   else if (S.view === 'auth') h = viewAuth();
   else if (S.view === 'onboard') h = viewOnboard();
-  else if (S.view === 'blocked') h = viewBlocked(S.blockText);
   else {
+    const tabs = TABS(); if (!tabs.some(t => t[0] === S.tab)) S.tab = 'orders';
     const o = !S.edit && S.detailId && S.orders.find(x => String(x.id) === String(S.detailId));
-    const tabs = [['orders', '▤', 'Work orders'], ['schedule', '◷', 'Schedule'], ['billing', '$', 'Billing'], ['contractors', '⚑', 'Contractors'], ['account', '☰', 'Account']];
     const sub = S.edit || o;
-    const title = S.edit ? (S.edit.kind === 'order' ? (S.edit.id ? 'Edit work order' : 'New work order') : (S.edit.id ? 'Contractor' : 'Add contractor')) : o ? 'Work order' : tabs.find(t => t[0] === S.tab)[2];
+    const title = S.edit ? (S.edit.kind === 'order' ? (S.edit.id ? 'Edit work order' : 'New work order') : (S.edit.id ? 'Contractor' : 'Add contractor')) : o ? (isMgmt() ? 'Work order' : 'Job') : tabs.find(t => t[0] === S.tab)[2];
     const body = S.edit ? (S.edit.kind === 'order' ? viewOrderForm() : viewContractorForm()) : o ? viewDetail(o) : S.tab === 'orders' ? viewOrders() : S.tab === 'schedule' ? viewSchedule() : S.tab === 'billing' ? viewBilling() : S.tab === 'contractors' ? viewContractors() : viewAccount();
     h = demoBar() + '<header>' + (sub ? '<button data-act="back" aria-label="Back">‹ Back</button>' : '') + '<h1>' + esc(title) + '</h1>' + (sub ? '' : '<button data-act="reload" aria-label="Refresh">↻</button>') + '</header><main>' + body + '</main>' +
       '<nav aria-label="Sections"><div>' + tabs.map(t => '<button data-act="tab" data-id="' + t[0] + '" class="' + (!sub && S.tab === t[0] ? 'on' : '') + '"><b aria-hidden="true">' + t[1] + '</b>' + t[2] + '</button>').join('') + '</div></nav>';
@@ -428,35 +528,44 @@ function render() {
 
 /* ---------- flow ---------- */
 const flash = (kind, text) => { S.msg = { kind, text }; };
-async function enter() {                 // after a session exists: profile -> gates -> data
+async function enter() {                 // after a session exists: profile -> company setup if needed -> data
   await api.loadProfile();
   if (!S.profile) {
-    let pend = null; try { pend = JSON.parse(localStorage.getItem(PENDING_KEY) || 'null'); } catch (_) {}
-    S.form = pend || {}; S.view = 'onboard'; return;
+    const pend = getPending(); setPending(null);
+    if (pend && pend.display && (pend.mode === 'join' ? pend.code : pend.company)) {   // finish what sign-up started
+      try { if (pend.mode === 'join') await api.joinTeam(pend.code, pend.display); else await api.createCompany(pend.company, pend.display); await api.loadProfile(); }
+      catch (e) { S.form = pend; S.view = 'onboard'; flash('err', errText(e)); return; }
+    }
+    if (!S.profile) { S.form = pend || {}; S.view = 'onboard'; return; }
   }
-  try { localStorage.removeItem(PENDING_KEY); } catch (_) {}
-  if (!MGMT_ROLES.includes(role())) { S.blockText = 'Work orders are visible to owners, managers and project managers. Ask your company owner for access.'; S.view = 'blocked'; return; }
   await api.loadData(); S.view = 'app';
 }
 async function run(fn, okText) {         // one place for busy state + error display
   if (S.busy) return; S.busy = true; S.msg = null; render();
   try { await fn(); if (okText) flash('good', okText); }
-  catch (e) { if (e.code === 'not_authenticated') { api.signOut(); S.view = 'auth'; } flash('err', errText(e)); }
+  catch (e) { if (e.code === 'not_authenticated') { api.signOut(); S.view = 'auth'; S.authMode = 'signin'; } flash('err', errText(e)); }
   S.busy = false; render();
 }
 const fields = form => Object.fromEntries([...new FormData(form)].filter(([, v]) => typeof v === 'string').map(([k, v]) => [k, v.trim()]));
+async function signUpFlow(f, pend) {
+  setPending(pend);
+  const signedIn = await api.signUp(f.email, f.password);
+  if (!signedIn) { S.authMode = 'signin'; flash('note', 'Check your email and tap the confirmation link. It brings you back here and finishes setup. Use this same phone or computer.'); return; }
+  await enter();
+}
 
 document.addEventListener('submit', ev => {
   const form = ev.target.closest('[data-form]'); if (!form) return; ev.preventDefault();
   const f = fields(form), kind = form.dataset.form, id = S.detailId;
   if (kind === 'signin') run(async () => { await api.signIn(f.email, f.password); await enter(); });
-  else if (kind === 'signup') run(async () => {
-    try { localStorage.setItem(PENDING_KEY, JSON.stringify({ company: f.company, display: f.display })); } catch (_) {}
-    const signedIn = await api.signUp(f.email, f.password);
-    if (!signedIn) { S.authMode = 'signin'; flash('note', 'Check your email to confirm your address, then sign in to finish setting up your company.'); return; }
-    await api.createCompany(f.company, f.display); await enter();
-  });
-  else if (kind === 'company') { S.form = f; run(async () => { await api.createCompany(f.company, f.display); await enter(); }); }
+  else if (kind === 'signup') run(() => signUpFlow(f, { mode: 'new', company: f.company, display: f.display }));
+  else if (kind === 'joinsignup') run(() => signUpFlow(f, { mode: 'join', code: f.code, display: f.display }));
+  else if (kind === 'forgot') run(async () => { await api.recover(f.email); S.authMode = 'signin'; }, 'If that email has an account, a reset link is on its way.');
+  else if (kind === 'newpw') run(async () => { await api.setPassword(f.password); await enter(); }, 'Password saved.');
+  else if (kind === 'company') { S.form = Object.assign({}, S.form, f); run(async () => { await api.createCompany(f.company, f.display); await enter(); }); }
+  else if (kind === 'join') { S.form = Object.assign({}, S.form, { code: f.code, display: f.display }); run(async () => { await api.joinTeam(f.code, f.display); await enter(); }); }
+  else if (kind === 'account') run(async () => { await api.updateAccount(f.company, f.display); await api.loadProfile(); await api.loadData(); }, 'Saved.');
+  else if (kind === 'invite') run(async () => { await api.createInvite(f.role); await api.loadData(); }, 'Join code created. Give it to your team member.');
   else if (kind === 'contractor') run(async () => { await api.saveContractor(S.edit.id, f); await api.loadData(); if (!S.edit.id) S.edit = null; }, 'Contractor saved.');
   else if (kind === 'order') run(async () => {
     const c = parseMoney(f.pay, true); if (c == null) throw appErr('amount_invalid');
@@ -467,34 +576,64 @@ document.addEventListener('submit', ev => {
   else if (kind === 'complete') { const files = [...form.querySelector('[name=photos]').files]; run(async () => { if (!files.length) throw appErr('photo_required'); await api.complete(id, files, f.notes); await api.loadData(); }, 'Marked complete.'); }
   else if (kind === 'pay') run(async () => { const c = parseMoney(f.amount); if (c == null) throw appErr('amount_required', 'Enter a dollar amount like 1250 or 1250.00.'); await api.submitPay(id, c, f.notes); await api.loadData(); }, 'Pay request saved.');
 });
+document.addEventListener('input', ev => {            // search filters the list without redrawing the box you are typing in
+  if (ev.target.id !== 'q') return; S.search = ev.target.value;
+  const l = document.getElementById('olist'); if (l) l.innerHTML = orderListHtml();
+});
+document.addEventListener('change', ev => {
+  const el = ev.target.closest('[data-change]'); if (!el) return;
+  if (el.dataset.change === 'setrole') run(async () => { await api.setRole(el.dataset.id, el.value); await api.loadData(); }, 'Role updated.');
+});
 document.addEventListener('click', ev => {
   const b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
   const a = b.dataset.act, id = b.dataset.id;
-  if (a === 'authmode') { S.authMode = S.authMode === 'signup' ? 'signin' : 'signup'; S.msg = null; }
+  if (a === 'authmode') { S.authMode = id; S.msg = null; }
   else if (a === 'tab') { S.tab = id; S.detailId = null; S.edit = null; S.msg = null; S.form = null; }
   else if (a === 'filter') S.filter = id;
-  else if (a === 'open') { S.detailId = id; S.msg = null; S.form = null; window.scrollTo(0, 0); }
+  else if (a === 'open') { S.edit = null; S.detailId = id; S.msg = null; S.form = null; window.scrollTo(0, 0); }
   else if (a === 'back') { if (S.edit && S.edit.kind === 'order' && S.edit.id) S.edit = null; else { S.edit = null; S.detailId = null; } S.msg = null; S.form = null; }
-  else if (a === 'neworder') { S.edit = { kind: 'order', id: null }; S.msg = null; }
+  else if (a === 'neworder') { S.edit = { kind: 'order', id: null, date: id || '' }; S.msg = null; window.scrollTo(0, 0); }
   else if (a === 'editorder') { S.edit = { kind: 'order', id: S.detailId }; S.msg = null; }
   else if (a === 'newcontractor') { S.edit = { kind: 'contractor', id: null }; S.msg = null; }
   else if (a === 'opencontractor') { S.edit = { kind: 'contractor', id }; S.msg = null; window.scrollTo(0, 0); }
+  else if (a === 'calnav') { const d = new Date(S.cal.y, S.cal.m + Number(id), 1); S.cal = { y: d.getFullYear(), m: d.getMonth() }; S.calDay = null; }
+  else if (a === 'calday') S.calDay = S.calDay === id ? null : id;
   else if (a === 'decline') S.form = { declining: true };
   else if (a === 'canceldecline') S.form = null;
+  else if (a === 'remove') S.form = { removing: id };
+  else if (a === 'removeyes') return run(async () => { await api.removeMember(id); S.form = null; await api.loadData(); }, 'Removed from the team.');
+  else if (a === 'cancelinvite') return run(async () => { await api.cancelInvite(id); await api.loadData(); }, 'Join code cancelled.');
   else if (a === 'accept') return run(async () => { await api.respond(S.detailId, true, null); await api.loadData(); }, 'Accepted. It is on your schedule.');
   else if (a === 'cancelorder') return run(async () => { await api.cancelOrder(S.detailId); await api.loadData(); }, 'Job cancelled.');
   else if (a === 'markpay') return run(async () => { await api.markPay(S.detailId, id); await api.loadData(); }, id === 'paid' ? 'Marked paid.' : 'Marked approved.');
   else if (a === 'linkcode') return run(async () => { await api.createLinkCode(S.edit.id); await api.loadData(); }, 'Link code created.');
   else if (a === 'unlink') return run(async () => { await api.revokeLink(S.edit.id); await api.loadData(); }, 'Unlinked. The old code or connection no longer works.');
   else if (a === 'reload') return run(() => api.loadData());
-  else if (a === 'signout') { api.signOut(); S.view = 'auth'; S.authMode = 'signin'; S.detailId = null; S.edit = null; S.msg = null; S.profile = null; }
+  else if (a === 'signout') { api.signOut(); S.view = 'auth'; S.authMode = 'signin'; S.detailId = null; S.edit = null; S.msg = null; S.profile = null; S.search = ''; S.tab = 'orders'; S.filter = 'open'; S.calDay = null; S.form = null; }
   render();
 });
 
 (async function boot() {
   document.title = APP_NAME;
   render();
-  if (!DEMO) { const s = loadSession(); if (s && s.access_token) { S.session = s; try { await enter(); render(); return; } catch (e) { if (e.code === 'not_authenticated') saveSession(null); else { S.view = 'auth'; flash('err', errText(e)); render(); return; } } } }
+  if (!DEMO) {
+    const hp = new URLSearchParams(location.hash.replace(/^#/, ''));
+    if (hp.get('access_token') || hp.get('error_description')) {      // came back from an email link
+      history.replaceState(null, '', location.pathname + location.search);
+      if (hp.get('error_description')) { S.view = 'auth'; flash('err', hp.get('error_description') + '. Ask for a new link.'); render(); return; }
+      try {
+        await api.sessionFromLink(hp);
+        if (hp.get('type') === 'recovery') { S.view = 'auth'; S.authMode = 'newpw'; render(); return; }
+        await enter(); render(); return;
+      } catch (e) { saveSession(null); S.view = 'auth'; flash('err', errText(e)); render(); return; }
+    }
+    const s = loadSession();
+    if (s && s.access_token) {
+      S.session = s;
+      try { await enter(); render(); return; }
+      catch (e) { if (e.code === 'not_authenticated') saveSession(null); else { S.view = 'auth'; flash('err', errText(e)); render(); return; } }
+    }
+  }
   S.view = 'auth'; render();
 })();
 </script>
