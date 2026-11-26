@@ -279,7 +279,7 @@ document.addEventListener('submit', async ev => {
 async function start() {                  // runs once a profile exists
   let opened = urlTokens.find(t => tokens.includes(t)) || null;
   if (inviteToken) {                      // the profile creates this contractor's card in the sub's account
-    const r = await rpc('request_join', { p_ctoken: inviteToken, p_company: profile.company, p_contact: profile.name, p_phone: profile.phone || '', p_email: profile.email || '', p_address: profile.address || '' });
+    const r = await rpc('request_join', { p_ctoken: inviteToken, p_company: profile.company, p_contact: profile.name, p_phone: profile.phone || '', p_email: profile.email || '', p_address: profile.address || '', p_known: tokens });
     inviteToken = ''; if (!tokens.includes(r.token)) tokens.push(r.token); opened = r.token;
   }
   syncUrl();
