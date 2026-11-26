@@ -3,96 +3,172 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#14213d">
+<meta name="theme-color" content="#16191d">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="referrer" content="no-referrer">
-<!-- CSP: Supabase hosts are allowed for API calls and for photos (this app's bucket and a linked contractor's photo URLs) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; connect-src 'self' https://*.supabase.co; form-action 'none'; base-uri 'none'">
+<!-- CSP: Supabase hosts for API calls and photos; Google Fonts for the heading typeface (falls back to system fonts offline) -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co; connect-src 'self' https://*.supabase.co; form-action 'none'; base-uri 'none'">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
 <title>Sub Portal</title>
 <style>
-:root{--navy:#14213d;--ink:#1b2333;--mut:#667085;--line:#e3e7ee;--bg:#f3f5f9;--card:#fff;--acc:#f59e0b;--ok:#15803d;--bad:#b42318;--info:#1d4ed8}
+/* Graphite and galvanized greys with one accent: the blue of a snapped chalk line. */
+:root{
+  --ink:#16191d;--ink2:#2c333b;--steel:#5d6975;--line:#e1e5ea;--mist:#eef1f4;--field:#f5f7f9;--paper:#fff;
+  --chalk:#1f5ae0;--chalk-d:#1848b8;--chalk-soft:#e8effd;
+  --ok:#19794d;--ok-soft:#e2f4ea;--warn:#8a5a0b;--warn-soft:#fbf0d9;--bad:#b8322a;--bad-soft:#fbe7e5;
+  --disp:"Barlow Semi Condensed","Arial Narrow","Helvetica Neue",system-ui,sans-serif;
+  --body:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  --lift:0 0 0 1px rgba(22,25,29,.05),0 1px 2px rgba(22,25,29,.05),0 6px 16px -8px rgba(22,25,29,.12);
+}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
-body{font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg);-webkit-text-size-adjust:100%}
+body{font:16px/1.45 var(--body);color:var(--ink);background:var(--mist);-webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased}
 button,input,textarea,select{font:inherit;color:inherit}
+a{color:var(--chalk);text-decoration-thickness:1px;text-underline-offset:2px}
 #app{max-width:720px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
-header{background:var(--navy);color:#fff;padding:14px 16px;padding-top:calc(14px + env(safe-area-inset-top));display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:5}
-header h1{font-size:18px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-header .sub{font-size:12px;opacity:.75}
-header button{background:none;border:0;color:#fff;font-size:15px;padding:6px 8px;cursor:pointer}
-main{flex:1;padding:14px 14px 96px}
-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom);z-index:5}
+
+/* top bar */
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:6px;padding:12px 12px 10px 16px;padding-top:calc(12px + env(safe-area-inset-top));background:rgba(238,241,244,.88);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px)}
+header h1{flex:1;margin:0;font:600 27px/1.1 var(--disp);letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;padding-bottom:7px}
+header h1::after{content:"";position:absolute;left:0;bottom:0;width:28px;height:3px;border-radius:2px;background:var(--chalk)}
+.hbtn{display:grid;place-items:center;width:40px;height:40px;border:0;border-radius:12px;background:transparent;color:var(--ink2);cursor:pointer}
+.hbtn:active{background:rgba(22,25,29,.07)}
+header .hbtn:first-child{margin-left:-8px}
+main{flex:1;padding:8px 14px 104px}
+
+/* bottom nav */
+nav{position:fixed;bottom:0;left:0;right:0;z-index:5;background:rgba(255,255,255,.94);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);display:flex;justify-content:center}
 nav div{display:flex;width:100%;max-width:720px}
-nav button{flex:1;min-width:0;background:none;border:0;padding:10px 2px 9px;font-size:11px;color:var(--mut);cursor:pointer;border-top:3px solid transparent}
-nav button b{display:block;font-size:19px;font-weight:400;line-height:1.2}
-nav button.on{color:var(--navy);border-top-color:var(--acc);font-weight:600}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
-button.card{display:block;width:100%;text-align:left;cursor:pointer}
-.row{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
-.title{font-weight:650;font-size:16px}
-.mut{color:var(--mut);font-size:14px}
-.doc{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}
-.dochead{display:flex;justify-content:space-between;gap:14px;margin-bottom:14px}
-.doctitle{font-size:20px;font-weight:700}
-.docmeta{text-align:right;font-size:14px;min-width:38%}
-.docmeta b{display:block;font-size:13px;letter-spacing:.1em}
-.docmeta span,.lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--mut);text-transform:uppercase;margin-top:8px}
-table.lines thead th{background:#333;color:#fff;padding:9px 10px;font-size:11px;border:0}
-table.lines td{padding:10px;border-bottom:1px dashed #c9ced6}
-table.lines tbody tr:nth-child(even){background:#ececec}
-.det{white-space:pre-wrap;color:#444;font-size:14px}
-.totals{margin-left:auto;max-width:300px;margin-top:12px}
-.totals div{display:flex;justify-content:space-between;padding:8px 10px;font-size:14px}
-.totals .due{background:#f1f1f1;font-weight:700;font-size:16px}
-.li{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:10px;background:#fafbfc}
-.two input{flex:1;min-width:0}
-.check{display:flex;gap:10px;align-items:flex-start;font-weight:400}.check input{width:auto;margin-top:3px}
-.ccard{border-left:5px solid var(--navy)}
-.cstats{display:flex;gap:8px;margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
-.cstats div{flex:1}.cstats b{display:block;font-size:17px}.cstats span{font-size:12px;color:var(--mut)}
-.bigcheck{width:64px;height:64px;border-radius:50%;background:#dcfce7;color:#15803d;font-size:36px;line-height:64px;margin:6px auto 12px}
-@media print{header,nav,.demo,.noprint{display:none!important}body{background:#fff}main{padding:0}.doc{border:0;padding:0}table.lines thead th{-webkit-print-color-adjust:exact;print-color-adjust:exact}table.lines tbody tr{-webkit-print-color-adjust:exact;print-color-adjust:exact;break-inside:avoid}}
-.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-.cal .dow{text-align:center;font-size:11px;color:var(--mut);padding-bottom:2px}
-.cd{aspect-ratio:1;border:1px solid var(--line);background:#fff;border-radius:8px;position:relative;cursor:pointer;font-size:14px;padding:0 0 8px}
-.cd.has{font-weight:700;border-color:var(--navy)}
-.cd.today{background:#fff4d6}
-.cd.sel{background:var(--navy);color:#fff;border-color:var(--navy)}
-.cd i{position:absolute;bottom:3px;left:50%;transform:translateX(-50%);font-style:normal;font-size:10px;font-weight:700;line-height:14px;background:var(--acc);color:#3b2500;border-radius:99px;padding:0 5px}
-.pill{background:#eef1f6;color:#344054;display:inline-block;font-size:12px;font-weight:650;padding:3px 9px;border-radius:99px;white-space:nowrap}
-.s-sent{background:#fef3c7;color:#92400e}.s-accepted{background:#dbeafe;color:#1e40af}.s-complete{background:#dcfce7;color:#166534}
-.s-declined,.s-cancelled,.s-rejected{background:#fee4e2;color:#912018}.s-submitted{background:#fef3c7;color:#92400e}.s-approved{background:#dbeafe;color:#1e40af}.s-paid{background:#dcfce7;color:#166534}
-.chips{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.chips button{border:1px solid var(--line);background:#fff;border-radius:99px;padding:7px 14px;font-size:14px;cursor:pointer}
-.chips button.on{background:var(--navy);border-color:var(--navy);color:#fff}
-h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:18px 2px 8px}
-label{display:block;font-size:14px;font-weight:600;margin:12px 0 5px}
-input,textarea,select{width:100%;border:1px solid #cbd2dc;border-radius:10px;padding:12px;background:#fff}
+nav button{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 2px 8px;border:0;background:none;color:var(--steel);font-size:11px;font-weight:500;cursor:pointer}
+nav button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+nav button.on{color:var(--chalk);font-weight:650}
+
+/* surfaces */
+.card{background:var(--paper);border-radius:16px;padding:15px 16px;margin-bottom:10px;box-shadow:var(--lift)}
+button.card{display:block;width:100%;border:0;text-align:left;cursor:pointer;transition:transform .08s ease}
+button.card:active{transform:scale(.985)}
+.row{display:flex;gap:12px;align-items:flex-start;justify-content:space-between}
+.who{display:flex;gap:12px;align-items:center;min-width:0}
+.title{font-weight:650;font-size:16px;line-height:1.3}
+.mut{color:var(--steel);font-size:14px}
+.pre{white-space:pre-wrap}
+.center{text-align:center}
+h2{font:600 17px/1.2 var(--disp);color:var(--ink2);margin:22px 2px 9px;letter-spacing:.005em}
+.empty{text-align:center;color:var(--steel);padding:44px 16px;line-height:1.6}
+
+/* monogram tile */
+.mono{flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:13px;background:var(--ink);color:#fff;font:600 17px/1 var(--disp);letter-spacing:.02em}
+.mono.big{width:88px;height:88px;border-radius:24px;font-size:34px}
+
+/* status */
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;line-height:1;padding:6px 9px;border-radius:8px;white-space:nowrap;background:var(--mist);color:var(--ink2)}
+.pill:empty{display:none}
+.pill[class*="s-"]::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.s-sent,.s-submitted{background:var(--warn-soft);color:var(--warn)}
+.s-accepted,.s-approved{background:var(--chalk-soft);color:var(--chalk-d)}
+.s-complete,.s-paid{background:var(--ok-soft);color:var(--ok)}
+.s-declined,.s-cancelled,.s-rejected{background:var(--bad-soft);color:var(--bad)}
+
+/* segmented filter */
+.chips{display:flex;gap:2px;background:#e0e4e9;border-radius:13px;padding:3px;margin-bottom:12px}
+.chips button{flex:1;min-width:0;border:0;background:none;border-radius:10px;padding:8px 4px;font-size:13px;font-weight:550;color:var(--ink2);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chips button.on{background:var(--paper);color:var(--ink);font-weight:650;box-shadow:0 1px 2px rgba(22,25,29,.12)}
+
+/* forms */
+label{display:block;font-size:13px;font-weight:600;color:var(--ink2);margin:14px 0 6px}
+input,textarea,select{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px 13px;background:var(--field);transition:border-color .12s,box-shadow .12s,background .12s}
+input[type=search]{background:var(--paper);box-shadow:var(--lift);border-color:transparent}
 textarea{min-height:84px;resize:vertical}
-input:focus,textarea:focus,select:focus,button:focus-visible{outline:2px solid var(--info);outline-offset:1px}
-.btn{display:block;width:100%;border:0;border-radius:10px;padding:14px;font-weight:650;font-size:16px;cursor:pointer;background:var(--navy);color:#fff;margin-top:12px}
-.btn.ok{background:var(--ok)}.btn.bad{background:#fff;color:var(--bad);border:1px solid var(--bad)}.btn.ghost{background:#fff;color:var(--navy);border:1px solid #cbd2dc}
+input:focus,textarea:focus,select:focus{outline:0;border-color:var(--chalk);background:var(--paper);box-shadow:0 0 0 3px var(--chalk-soft)}
+button:focus-visible,a:focus-visible,.filebtn:focus-within{outline:2px solid var(--chalk);outline-offset:2px}
+::placeholder{color:#8c96a1}
+.btn{display:block;width:100%;border:0;border-radius:14px;padding:14px 16px;margin-top:12px;font-weight:650;font-size:16px;text-align:center;cursor:pointer;background:var(--chalk);color:#fff;transition:transform .08s ease,background .12s}
+.btn:active{transform:scale(.985);background:var(--chalk-d)}
+.btn.ok{background:var(--ok)}
+.btn.bad{background:var(--bad-soft);color:var(--bad)}
+.btn.ghost{background:var(--chalk-soft);color:var(--chalk-d)}
 .btn[disabled]{opacity:.55;cursor:default}
-.two{display:flex;gap:10px}.two .btn{flex:1}
-.link{background:none;border:0;color:var(--info);text-decoration:underline;cursor:pointer;padding:8px 0;font-size:15px}
-.msg{border-radius:10px;padding:11px 13px;margin-bottom:12px;font-size:15px}
-.msg.err{background:#fee4e2;color:#7a271a}.msg.good{background:#dcfce7;color:#14532d}.msg.note{background:#e0e7ff;color:#1e3a8a}
-.demo{background:var(--acc);color:#3b2500;font-size:13px;font-weight:650;text-align:center;padding:5px 10px}
+.two{display:flex;gap:10px}.two .btn{flex:1}.two input{flex:1;min-width:0}
+.link{background:none;border:0;padding:8px 0;color:var(--chalk);font-size:15px;font-weight:550;cursor:pointer;text-decoration:none}
+.check{display:flex;gap:10px;align-items:flex-start;font-weight:450;font-size:15px;color:var(--ink)}
+.check input{width:20px;height:20px;margin:1px 0 0;accent-color:var(--chalk);flex:none}
+.filebtn{position:relative;overflow:hidden;cursor:pointer;margin-top:12px}
+.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+label.link.filebtn{margin:0;display:inline-block}
+.msg{border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:15px;font-weight:500}
+.msg.err{background:var(--bad-soft);color:#7d1f19}.msg.good{background:var(--ok-soft);color:#0f5132}.msg.note{background:var(--chalk-soft);color:#143a8f}
+.demo{background:var(--ink);color:#d7dde4;font-size:12px;font-weight:600;text-align:center;padding:5px 10px;letter-spacing:.02em}
+
+/* numbers */
+.pay{font:600 28px/1.15 var(--disp);letter-spacing:-.005em}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px}
+.stats .card{margin:0;padding:12px 10px}
+.stats b{display:block;font:600 20px/1.2 var(--disp);margin-top:2px}
+.ccard .title{font-size:17px}
+.cstats{display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.cstats div{flex:1;min-width:0}
+.cstats b{display:block;font:600 20px/1.15 var(--disp)}
+.cstats span{font-size:12px;color:var(--steel)}
+
+/* tables and photos */
 table{width:100%;border-collapse:collapse;font-size:15px}
-td,th{text-align:left;padding:7px 4px;border-bottom:1px solid var(--line);vertical-align:top}
-th{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+td,th{text-align:left;padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:top}
 td.n,th.n{text-align:right;white-space:nowrap}
 .photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.photos a{display:block;aspect-ratio:1;border-radius:8px;overflow:hidden;background:#dfe4ec}
+.photos a{display:block;aspect-ratio:1;border-radius:12px;overflow:hidden;background:#dfe4ea}
 .photos img{width:100%;height:100%;object-fit:cover;display:block}
-.pay{font-size:22px;font-weight:700}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px}
-.stats .card{margin:0;padding:11px;text-align:center}.stats b{display:block;font-size:17px}
-.auth{max-width:420px;margin:6vh auto 0;width:100%}
-.auth h1{font-size:26px;margin:0 0 4px;color:var(--navy)}
-.pre{white-space:pre-wrap}
-.empty{text-align:center;color:var(--mut);padding:36px 10px}
+
+/* documents: work order and invoice share one layout */
+.doc{background:var(--paper);border-radius:16px;padding:18px 16px;margin-bottom:12px;box-shadow:var(--lift)}
+.dochead{display:flex;justify-content:space-between;gap:14px;margin-bottom:16px}
+.doclogo{display:block;max-height:54px;max-width:150px;margin-bottom:8px;object-fit:contain}
+.doctitle{font:600 19px/1.2 var(--disp)}
+.docmeta{text-align:right;font-size:14px;min-width:38%}
+.docmeta b{display:block;font:700 15px/1 var(--disp);letter-spacing:.14em}
+.docmeta span,.lbl{display:block;font-size:12px;font-weight:600;color:var(--steel);margin-top:9px}
+table.lines thead th{background:var(--ink);color:#fff;padding:9px 10px;font-size:12px;font-weight:600;border:0}
+table.lines thead th:first-child{border-radius:8px 0 0 8px}table.lines thead th:last-child{border-radius:0 8px 8px 0}
+table.lines td{padding:11px 10px;border-bottom:1px dashed #ccd2d9}
+table.lines tbody tr:nth-child(even){background:#f1f3f5}
+.det{white-space:pre-wrap;color:var(--ink2);font-size:14px}
+.totals{margin-left:auto;max-width:300px;margin-top:12px}
+.totals div{display:flex;justify-content:space-between;padding:8px 10px;font-size:14px}
+.totals .due{background:var(--mist);border-radius:10px;font:600 19px/1.2 var(--disp);align-items:center}
+.li{border-radius:14px;padding:12px;margin-top:10px;background:var(--mist)}
+.li input,.li textarea{background:var(--paper)}
+
+/* calendar */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal .dow{text-align:center;font-size:11px;font-weight:600;color:var(--steel);padding-bottom:4px}
+.cd{aspect-ratio:1;border:0;background:none;border-radius:12px;position:relative;cursor:pointer;font-size:15px;padding:0 0 9px;color:var(--ink)}
+.cd.has{font-weight:700}
+.cd.today{box-shadow:inset 0 0 0 1.5px var(--chalk)}
+.cd.sel{background:var(--chalk);color:#fff}
+.cd i{position:absolute;bottom:5px;left:50%;transform:translateX(-50%);font-style:normal;font-size:10px;font-weight:700;line-height:13px;min-width:13px;background:var(--chalk);color:#fff;border-radius:99px;padding:0 4px}
+.cd.sel i{background:#fff;color:var(--chalk-d)}
+
+/* sign-in, email pages and first-time setup: graphite field with lap-siding lines, white sheet rising over it */
+.authwrap{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;background:var(--ink) repeating-linear-gradient(180deg,rgba(255,255,255,0) 0 27px,rgba(255,255,255,.055) 27px 28px)}
+.brand{padding:calc(46px + env(safe-area-inset-top)) 24px 30px;color:#fff}
+.brandname{font:700 40px/1 var(--disp);letter-spacing:-.01em}
+.brandname::after{content:"";display:block;width:44px;height:4px;border-radius:2px;background:var(--chalk);margin-top:12px;box-shadow:0 0 0 1px rgba(255,255,255,.08)}
+.brandsub{color:#aeb7c1;font-size:15px;margin-top:14px;max-width:30ch}
+.sheet{flex:1;background:var(--paper);border-radius:26px 26px 0 0;padding:26px 22px 40px}
+.sheeth{font:600 26px/1.15 var(--disp);margin:0 0 6px}
+.links{display:flex;flex-direction:column;align-items:flex-start;margin-top:16px}
+.steps{display:flex;gap:6px;margin-top:22px}
+.steps i{flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.18)}
+.steps i.on{background:var(--chalk)}
+.steps+.brandsub{margin-top:10px}
+.logodrop{display:grid;place-items:center;height:150px;margin:16px 0 4px;border-radius:18px;background:var(--mist)}
+.logodrop img{max-width:70%;max-height:110px;object-fit:contain}
+.acctlogo{width:44px;height:44px;border-radius:12px;object-fit:contain;background:var(--mist);flex:none}
+.bigcheck{width:68px;height:68px;border-radius:50%;background:var(--ok-soft);color:var(--ok);font-size:36px;line-height:68px;margin:14px auto 12px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media print{header,nav,.demo,.noprint{display:none!important}body{background:#fff}main{padding:0}.doc{box-shadow:none;border-radius:0;padding:0}table.lines thead th,table.lines tbody tr{-webkit-print-color-adjust:exact;print-color-adjust:exact}table.lines tbody tr{break-inside:avoid}}
 </style>
 </head>
 <body>
@@ -124,7 +200,7 @@ const DEMO = !SB_URL || !SB_KEY || /[?&]demo=1\b/.test(location.search);
 const SITE_URL = location.origin + location.pathname;
 
 const NOW = new Date();
-const S = { view: 'loading', authMode: 'signin', tab: 'contractors', stack: [], draft: null, cview: 'jobs', saved: [],
+const S = { view: 'loading', setupStep: 1, authMode: 'signin', tab: 'contractors', stack: [], draft: null, cview: 'jobs', saved: [],
   filter: 'open', search: '', detailId: null, edit: null,
   cal: { y: NOW.getFullYear(), m: NOW.getMonth() }, calDay: null,
   session: null, profile: null, company: null, orders: [], pays: [], contractors: [], team: [], invites: [],
@@ -187,6 +263,7 @@ const ERR = {
   display_name_required: 'Enter your name.',
   invalid_team_code: 'That join code was not found, was already used, or has expired.',
   role_invalid: 'Pick a role.',
+  logo_invalid: 'That logo could not be saved. Try uploading it again.',
   cannot_change_self: 'You cannot change your own role or remove yourself.',
   name_required: 'Enter the contractor name.',
   title_required: 'Enter a title for the work order.',
@@ -295,6 +372,13 @@ const live = {
   setRole: (uid, r) => sb.rpc('team_set_role', { p_user_id: uid, p_role: r }),
   removeMember: uid => sb.rpc('team_remove_member', { p_user_id: uid }),
   updateAccount: f => sb.rpc('account_update', { p_company_name: f.company || null, p_display_name: f.display, p_phone: f.phone || null, p_email: f.email || null, p_address: f.address || null }),
+  saveCompanyProfile: f => sb.rpc('company_profile_save', { p_phone: f.phone == null ? null : f.phone, p_email: f.email == null ? null : f.email, p_address: f.address == null ? null : f.address, p_logo_path: f.logo_path == null ? null : f.logo_path, p_setup_done: f.setup_done == null ? null : f.setup_done }),
+  async uploadLogo(file) {
+    const png = /png|svg|webp|gif/i.test(file.type), blob = await toImage(file, 600, png ? 'image/png' : 'image/jpeg');
+    const path = S.profile.company_id + '/logo/' + uuid() + (png ? '.png' : '.jpg');
+    await sb.req('/storage/v1/object/' + PHOTO_BUCKET + '/' + path, { method: 'POST', body: blob, headers: { 'Content-Type': png ? 'image/png' : 'image/jpeg' } });
+    await sb.rpc('company_profile_save', { p_phone: null, p_email: null, p_address: null, p_logo_path: path, p_setup_done: null });
+  },
   saveItem: (id, f) => sb.rpc('saved_item_save', { p_id: id || null, p_contractor_id: f.contractor_id || null, p_title: f.title, p_detail: f.detail, p_unit: f.unit, p_rate: f.rateCents / 100 }),
   deleteItem: id => sb.rpc('saved_item_delete', { p_id: id }),
   saveContractor: (id, f) => sb.rpc('contractor_save', { p_id: id || null, p_name: f.name, p_contact_name: f.contact_name, p_phone: f.phone, p_email: f.email, p_address: f.address, p_notes: f.notes }),
@@ -317,14 +401,15 @@ const live = {
   markPay: (id, status) => sb.rpc('pay_mark_manual', { p_work_order_id: id, p_status: status }),
   signOut() { saveSession(null); }
 };
-function toJpeg(file) {                  // downscale to max 1600px, JPEG
+function toJpeg(file) { return toImage(file, 1600, 'image/jpeg'); }
+function toImage(file, max, type) {      // downscale and re-encode; PNG keeps a transparent logo background
   return new Promise((res, rej) => {
     const img = new Image(), url = URL.createObjectURL(file);
     img.onload = () => {
-      const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const k = Math.min(1, max / Math.max(img.width, img.height));
       const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
-      c.toBlob(b => b ? res(b) : rej(appErr('photo', 'Could not read that photo.')), 'image/jpeg', 0.82);
+      c.toBlob(b => b ? res(b) : rej(appErr('photo', 'Could not read that photo.')), type, 0.82);
     };
     img.onerror = () => { URL.revokeObjectURL(url); rej(appErr('photo', 'Could not read that photo. Try a JPG or PNG.')); };
     img.src = url;
@@ -358,11 +443,11 @@ const demoDb = {
 const wait = () => new Promise(r => setTimeout(r, 120));
 const dOrder = id => demoDb.orders.find(x => x.id === id);
 const demo = {
-  async signIn() { await wait(); S.session = { user: { id: 'demo', email: 'you@example.com' } }; demoDb.user = demoDb.user || { company: 'Demo Subcontracting LLC', name: 'Demo User', role: 'owner' }; },
+  async signIn() { await wait(); S.session = { user: { id: 'demo', email: 'you@example.com' } }; demoDb.user = demoDb.user || { company: 'Demo Subcontracting LLC', name: 'Demo User', role: 'owner', phone: '555-0199', email: 'you@example.com', setup_done: true }; },
   async signUp() { await wait(); S.session = { user: { id: 'demo', email: 'you@example.com' } }; demoDb.user = null; return true; },
   async recover() { await wait(); },
   async setPassword() { await wait(); },
-  async loadProfile() { S.profile = demoDb.user ? { id: 'demo', company_id: 'demo-co', role: demoDb.user.role, display_name: demoDb.user.name } : null; S.company = demoDb.user ? { id: 'demo-co', name: demoDb.user.company, phone: demoDb.user.phone || '555-0199', email: demoDb.user.email || 'you@example.com', address: demoDb.user.address || '' } : null; },
+  async loadProfile() { S.profile = demoDb.user ? { id: 'demo', company_id: 'demo-co', role: demoDb.user.role, display_name: demoDb.user.name } : null; S.company = demoDb.user ? { id: 'demo-co', name: demoDb.user.company, phone: demoDb.user.phone || '', email: demoDb.user.email || '', address: demoDb.user.address || '', logo_path: demoDb.user.logo || '', setup_done: !!demoDb.user.setup_done } : null; },
   async loadData() {
     await wait(); const me = demoDb.team.find(t => t.id === 'demo'); me.role = demoDb.user.role; me.display_name = demoDb.user.name;
     S.team = demoDb.team.map(t => ({ ...t })); S.invites = demoDb.invites.map(i => ({ ...i }));
@@ -370,12 +455,14 @@ const demo = {
     S.orders = demoDb.orders.map(o => ({ ...o })); S.pays = demoDb.pays.map(p => ({ ...p })); S.contractors = demoDb.contractors.map(c => ({ ...c })).sort((a, b) => a.name.localeCompare(b.name)); S.saved = demoDb.saved.map(i => ({ ...i })).sort((a, b) => a.title.localeCompare(b.title));
   },
   async createCompany(name, display) { if (!name) throw appErr('company_name_required'); demoDb.user = { company: name, name: display, role: 'owner' }; },
-  async joinTeam(code, display) { await wait(); if (!code) throw appErr('invalid_team_code'); demoDb.user = { company: 'Demo Subcontracting LLC', name: display || 'Crew Member', role: 'laborer' }; },
+  async joinTeam(code, display) { await wait(); if (!code) throw appErr('invalid_team_code'); demoDb.user = { company: 'Demo Subcontracting LLC', name: display || 'Crew Member', role: 'laborer', setup_done: true }; },
   async createInvite(r) { await wait(); if (!['manager', 'project_manager', 'laborer'].includes(r)) throw appErr('role_invalid'); demoDb.invites.unshift({ id: uuid(), role: r, code: uuid().replace(/-/g, '').slice(0, 10).toUpperCase(), expires_at: day(7) }); },
   async cancelInvite(id) { await wait(); demoDb.invites = demoDb.invites.filter(i => i.id !== id); },
   async setRole(uid, r) { await wait(); const t = demoDb.team.find(x => x.id === uid); if (!t || t.role === 'owner') throw appErr('not_found'); t.role = r; },
   async removeMember(uid) { await wait(); if (uid === 'demo') throw appErr('cannot_change_self'); demoDb.team = demoDb.team.filter(x => x.id !== uid); },
   async updateAccount(f) { await wait(); if (!f.display) throw appErr('display_name_required'); demoDb.user.name = f.display; if (demoDb.user.role === 'owner') { if (!f.company) throw appErr('company_name_required'); Object.assign(demoDb.user, { company: f.company, phone: f.phone, email: f.email, address: f.address }); } },
+  async saveCompanyProfile(f) { await wait(); ['phone', 'email', 'address'].forEach(k => { if (f[k] != null) demoDb.user[k] = f[k]; }); if (f.logo_path != null) demoDb.user.logo = f.logo_path; if (f.setup_done != null) demoDb.user.setup_done = f.setup_done; },
+  async uploadLogo(file) { await wait(); demoDb.user.logo = URL.createObjectURL(file); },
   async saveItem(id, f) { await wait(); if (!f.title) throw appErr('title_required'); const row = { contractor_id: f.contractor_id || null, title: f.title, detail: f.detail, unit: f.unit, rate: f.rateCents / 100 }; const cur = demoDb.saved.find(x => x.id === id); if (cur) Object.assign(cur, row); else demoDb.saved.push(Object.assign({ id: uuid() }, row)); },
   async deleteItem(id) { await wait(); demoDb.saved = demoDb.saved.filter(x => x.id !== id); },
   async saveContractor(id, f) { await wait(); if (!f.name) throw appErr('name_required'); const c = demoDb.contractors.find(x => x.id === id); if (c) Object.assign(c, f); else demoDb.contractors.push(Object.assign({ id: uuid(), link_status: 'manual' }, f)); },
@@ -399,9 +486,22 @@ const payFor = id => S.pays.find(p => p.work_order_id === id) || null;
 const contractor = id => S.contractors.find(c => c.id === id) || null;
 const gcName = o => { const c = contractor(o.contractor_id); return c ? c.name : (o.contractor_name || ''); };
 const byDate = (a, b) => String(a.scheduled_date || '9999').localeCompare(String(b.scheduled_date || '9999'));
+const ico = d => '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+const ICON = {
+  contractors: ico('<path d="M3 21V7l7-4v18"/><path d="M10 9h8l3 3v9H3"/><path d="M14 13v.01M14 17v.01M18 17v.01"/>'),
+  orders: ico('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/>'),
+  schedule: ico('<rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'),
+  billing: ico('<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9.5 8h5M9.5 12h5"/>'),
+  account: ico('<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>'),
+  back: ico('<path d="M15 5l-7 7 7 7"/>'),
+  refresh: ico('<path d="M20 11a8 8 0 1 0-2.3 6.3"/><path d="M20 5v6h-6"/>'),
+  chev: ico('<path d="M9 5l7 7-7 7"/>')
+};
+const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+const logoUrl = () => S.company && S.company.logo_path ? photoUrl({ path: S.company.logo_path }) : '';
 const TABS = () => isMgmt()
-  ? [['contractors', '⚑', 'Contractors'], ['orders', '▤', 'Work orders'], ['schedule', '◷', 'Schedule'], ['billing', '$', 'Invoices'], ['account', '☰', 'Account']]
-  : [['orders', '▤', 'Jobs'], ['schedule', '◷', 'Schedule'], ['account', '☰', 'Account']];
+  ? [['contractors', ICON.contractors, 'Contractors'], ['orders', ICON.orders, 'Work orders'], ['schedule', ICON.schedule, 'Schedule'], ['billing', ICON.billing, 'Invoices'], ['account', ICON.account, 'Account']]
+  : [['orders', ICON.orders, 'Jobs'], ['schedule', ICON.schedule, 'Schedule'], ['account', ICON.account, 'Account']];
 
 /* ---------- views ---------- */
 const msgHtml = () => S.msg ? '<div class="msg ' + S.msg.kind + ' noprint" role="status">' + esc(S.msg.text) + '</div>' : '';
@@ -412,29 +512,46 @@ const dfield = (id, key, label, extra) => '<label for="' + id + '">' + label + '
 const roleOptions = (sel, list) => list.map(r => '<option value="' + r + '"' + (sel === r ? ' selected' : '') + '>' + ROLE_LABEL[r] + '</option>').join('');
 const pill = (cls, text) => '<span class="pill ' + cls + '">' + esc(text) + '</span>';
 
+const shell = (top, body) => demoBar() + '<div class="authwrap"><div class="brand"><div class="brandname">' + esc(APP_NAME) + '</div>' + top + '</div><main class="sheet">' + msgHtml() + body + '</main></div>';
 function viewAuth() {
   const m = S.authMode, d = DEMO;
   const email = field('em', 'email', 'Email', d ? 'you@example.com' : '', 'type="email" autocomplete="email" required');
   const pw = n => field('pw', 'password', n ? 'New password' : 'Password', d ? 'demo-only' : '', 'type="password" required minlength="6" autocomplete="' + (m === 'signin' ? 'current-password' : 'new-password') + '"');
   const link = (mode, t) => '<button class="link" data-act="authmode" data-id="' + mode + '">' + t + '</button>';
-  let form, links = link('signin', 'Back to sign in');
+  let head = 'Sign in', form, links = link('signin', 'Back to sign in');
   if (m === 'confirmed') {               // landing page for the "confirm your email" link
-    form = '<div class="card" style="text-align:center"><div class="bigcheck" aria-hidden="true">✓</div><div class="title" style="font-size:20px">Email confirmed</div><p class="mut">' + esc(S.session && S.session.user.email) + ' is confirmed and you are signed in.</p><button class="btn" data-act="confirmcontinue"' + dis() + '>Continue</button></div>'; links = '';
+    head = 'Email confirmed'; links = '';
+    form = '<div class="center"><div class="bigcheck" aria-hidden="true">✓</div><p class="mut">' + esc(S.session && S.session.user.email) + ' is confirmed and you are signed in.</p><button class="btn" data-act="confirmcontinue"' + dis() + '>Continue</button></div>';
   } else if (m === 'checkemail') {
-    form = '<div class="card" style="text-align:center"><div class="title" style="font-size:20px">Check your email</div><p class="mut">We sent a confirmation link to ' + esc(S.form && S.form.email) + '. Tap it to confirm your email and finish setup.</p><p class="mut">Open the link on this same phone or computer. Nothing there? Check spam.</p></div>';
-  } else if (m === 'signup') { form = '<form data-form="signup" class="card">' + email + pw() + field('cn', 'company', 'Company name', '', 'required') + field('dn', 'display', 'Your name', '', 'required') + '<button class="btn"' + dis() + '>Create company account</button></form>'; }
-  else if (m === 'join') { form = '<form data-form="joinsignup" class="card"><p class="mut" style="margin:0">Your owner or manager gives you a join code from their Account screen.</p>' + field('jc', 'code', 'Join code', '', 'required autocapitalize="characters" autocomplete="off"') + field('dn', 'display', 'Your name', '', 'required') + email + pw() + '<button class="btn"' + dis() + '>Join my company</button></form>'; }
-  else if (m === 'forgot') { form = '<form data-form="forgot" class="card"><p class="mut" style="margin:0">We will email you a link to set a new password.</p>' + email + '<button class="btn"' + dis() + '>Send reset link</button></form>'; }
-  else if (m === 'newpw') { form = '<form data-form="newpw" class="card"><p class="mut" style="margin:0">Choose a new password for ' + esc(S.session && S.session.user.email) + '.</p>' + pw(true) + '<button class="btn"' + dis() + '>Save password</button></form>'; links = ''; }
-  else { form = '<form data-form="signin" class="card">' + email + pw() + '<button class="btn"' + dis() + '>Sign in</button></form>'; links = link('signup', 'Start a new company account') + '<br>' + link('join', 'Join your company with a code') + '<br>' + link('forgot', 'Forgot password?'); }
-  return demoBar() + '<main><div class="auth"><h1>' + esc(APP_NAME) + '</h1><p class="mut">Work orders, scheduling and invoices for subcontractors.</p>' + msgHtml() + form + links + '</div></main>';
+    head = 'Check your email';
+    form = '<p>We sent a confirmation link to <b>' + esc(S.form && S.form.email) + '</b>. Tap it to confirm your email and finish setup.</p><p class="mut">Open the link on this same phone or computer. Nothing there? Check spam.</p>';
+  } else if (m === 'signup') { head = 'Create your account'; form = '<form data-form="signup"><p class="mut" style="margin:0">You will set up your company right after this.</p>' + email + pw() + '<button class="btn"' + dis() + '>Create account</button></form>'; }
+  else if (m === 'join') { head = 'Join your company'; form = '<form data-form="joinsignup"><p class="mut" style="margin:0">Your owner or manager gives you a join code from their Account screen.</p>' + field('jc', 'code', 'Join code', '', 'required autocapitalize="characters" autocomplete="off"') + field('dn', 'display', 'Your name', '', 'required') + email + pw() + '<button class="btn"' + dis() + '>Join my company</button></form>'; }
+  else if (m === 'forgot') { head = 'Reset your password'; form = '<form data-form="forgot"><p class="mut" style="margin:0">We will email you a link to set a new password.</p>' + email + '<button class="btn"' + dis() + '>Send reset link</button></form>'; }
+  else if (m === 'newpw') { head = 'Choose a new password'; links = ''; form = '<form data-form="newpw"><p class="mut" style="margin:0">For ' + esc(S.session && S.session.user.email) + '.</p>' + pw(true) + '<button class="btn"' + dis() + '>Save password</button></form>'; }
+  else { form = '<form data-form="signin">' + email + pw() + '<button class="btn"' + dis() + '>Sign in</button></form>'; links = link('signup', 'Start a new company account') + link('join', 'Join your company with a code') + link('forgot', 'Forgot password?'); }
+  return shell('<div class="brandsub">Work orders, scheduling and invoices for subcontractors.</div>', '<h1 class="sheeth">' + head + '</h1>' + form + '<div class="links">' + links + '</div>');
 }
-function viewOnboard() {
+function viewOnboard() {                  // signed in, not in a company, and wants to join one
   const p = S.form || {};
-  return demoBar() + '<main><div class="auth"><h1>Finish setting up</h1><p class="mut">Signed in as ' + esc(S.session.user.email) + '. This login is not part of a company yet.</p>' + msgHtml() +
-    '<form data-form="company" class="card"><div class="title">Start a new company</div>' + field('cn', 'company', 'Company name', p.company, 'required') + field('dn', 'display', 'Your name', p.display, 'required') + '<button class="btn"' + dis() + '>Create company</button></form>' +
-    '<form data-form="join" class="card"><div class="title">Or join your company</div>' + field('jc', 'code', 'Join code', p.code, 'required autocapitalize="characters" autocomplete="off"') + field('dn2', 'display', 'Your name', p.display, 'required') + '<button class="btn ghost"' + dis() + '>Join</button></form>' +
-    '<button class="link" data-act="signout">Sign out</button></div></main>';
+  return shell('<div class="brandsub">Signed in as ' + esc(S.session.user.email) + '</div>', '<h1 class="sheeth">Join your company</h1><form data-form="join">' + field('jc', 'code', 'Join code', p.code, 'required autocapitalize="characters" autocomplete="off"') + field('dn2', 'display', 'Your name', p.display, 'required') + '<button class="btn"' + dis() + '>Join</button></form>' +
+    '<div class="links"><button class="link" data-act="tosetup">Start a new company instead</button><button class="link" data-act="signout">Sign out</button></div>');
+}
+// first-time setup: company name, logo, contact details, done
+function viewSetup() {
+  const n = S.setupStep, co = S.company || {}, p = S.form || {};
+  const bar = '<div class="steps" role="img" aria-label="Step ' + n + ' of 4">' + [1, 2, 3, 4].map(i => '<i class="' + (i <= n ? 'on' : '') + '"></i>').join('') + '</div><div class="brandsub">Step ' + n + ' of 4</div>';
+  let body;
+  if (n === 1) body = '<h1 class="sheeth">Name your company</h1><p class="mut">This is how contractors will see you on work orders and invoices.</p><form data-form="setup1">' + field('cn', 'company', 'Company name', co.name || p.company, 'required autocomplete="organization"') + field('dn', 'display', 'Your name', (S.profile && S.profile.display_name) || p.display, 'required autocomplete="name"') + '<button class="btn"' + dis() + '>Continue</button></form>' +
+    (S.profile ? '' : '<div class="links"><button class="link" data-act="tojoin">I have a join code from my company</button><button class="link" data-act="signout">Sign out</button></div>');
+  else if (n === 2) body = '<h1 class="sheeth">Add your logo</h1><p class="mut">It goes at the top of your invoices and work orders. You can change it later in Account.</p>' +
+    '<div class="logodrop">' + (logoUrl() ? '<img src="' + esc(logoUrl()) + '" alt="Your logo">' : '<div class="mono big" aria-hidden="true">' + esc(initials(co.name)) + '</div>') + '</div>' +
+    '<label class="btn ghost filebtn">' + (S.busy ? 'Uploading…' : logoUrl() ? 'Choose a different logo' : 'Upload logo') + '<input type="file" accept="image/*" data-change="logo"' + dis() + '></label>' +
+    '<button class="btn" data-act="setupnext"' + dis() + '>' + (logoUrl() ? 'Continue' : 'Skip for now') + '</button>';
+  else if (n === 3) body = '<h1 class="sheeth">How can contractors reach you?</h1><p class="mut">Shown on your invoices. All optional.</p><form data-form="setup3">' + field('sph', 'phone', 'Business phone', co.phone, 'type="tel" autocomplete="tel"') + field('sem', 'email', 'Business email', co.email || S.session.user.email, 'type="email" autocomplete="email"') + field('sad', 'address', 'Business address', co.address, 'autocomplete="street-address"') + '<button class="btn"' + dis() + '>Continue</button></form>';
+  else body = '<h1 class="sheeth">' + esc(co.name || 'Your company') + ' is set up</h1><div class="logodrop">' + (logoUrl() ? '<img src="' + esc(logoUrl()) + '" alt="Your logo">' : '<div class="mono big" aria-hidden="true">' + esc(initials(co.name)) + '</div>') + '</div><p class="mut">Next, add a contractor you work for. Their jobs, invoices and price list all live on their card.</p>' +
+    '<button class="btn" data-act="setupfinish" data-id="contractor"' + dis() + '>Add my first contractor</button><button class="btn ghost" data-act="setupfinish"' + dis() + '>Go to the app</button>';
+  return shell(bar, body + (n > 1 && n < 4 ? '<div class="links"><button class="link" data-act="setupback">Back</button></div>' : ''));
 }
 
 /* cards */
@@ -451,7 +568,7 @@ function invoiceCard(o) {
 function contractorCard(c) {
   const mine = S.orders.filter(o => o.contractor_id === c.id), open = mine.filter(o => o.status === 'sent' || o.status === 'accepted').length;
   const owed = mine.reduce((t, o) => { const p = payFor(o.id); return t + (p && (p.status === 'submitted' || p.status === 'approved') ? cents(p.amount) : 0); }, 0);
-  return '<button class="card ccard" data-act="opencontractor" data-id="' + esc(c.id) + '"><div class="row"><div><div class="title" style="font-size:18px">' + esc(c.name) + '</div><div class="mut">' + esc(c.contact_name || '') + '</div></div>' +
+  return '<button class="card ccard" data-act="opencontractor" data-id="' + esc(c.id) + '"><div class="row"><div class="who"><div class="mono" aria-hidden="true">' + esc(initials(c.name)) + '</div><div><div class="title">' + esc(c.name) + '</div><div class="mut">' + esc(c.contact_name || '') + '</div></div></div>' +
     (c.link_status === 'active' ? pill('s-complete', 'Linked') : c.link_status === 'pending' ? pill('s-sent', 'Code waiting') : '') + '</div>' +
     '<div class="cstats"><div><b>' + open + '</b><span>open job' + (open === 1 ? '' : 's') + '</span></div><div><b>' + mine.length + '</b><span>total</span></div><div><b>' + money(owed) + '</b><span>owed to you</span></div></div></button>';
 }
@@ -464,7 +581,7 @@ function linesTable(lines, priced) {
 }
 function docHead(kind, metaRows) {
   const c = S.company || {};
-  return '<div class="dochead"><div><div class="doctitle">' + esc(c.name || '') + '</div>' + [S.profile && S.profile.display_name, c.phone, c.email, c.address].filter(Boolean).map(v => '<div class="mut">' + esc(v) + '</div>').join('') + '</div>' +
+  return '<div class="dochead"><div>' + (logoUrl() ? '<img class="doclogo" src="' + esc(logoUrl()) + '" alt="">' : '') + '<div class="doctitle">' + esc(c.name || '') + '</div>' + [S.profile && S.profile.display_name, c.phone, c.email, c.address].filter(Boolean).map(v => '<div class="mut">' + esc(v) + '</div>').join('') + '</div>' +
     '<div class="docmeta"><b>' + kind + '</b>' + metaRows.filter(r => r[1]).map(r => '<span>' + r[0] + '</span><div>' + r[1] + '</div>').join('') + '</div></div>';
 }
 function workOrderDoc(o) {
@@ -575,8 +692,8 @@ function viewContractor() {
     else link = '<div class="card"><div class="title">Link this contractor</div><p class="mut">If this contractor uses Better View Pro, linking lets them send work orders straight to you. You create a code and give it to them.</p>' + (canBill() ? '<button class="btn" data-act="linkcode"' + dis() + '>Create link code</button>' : '<div class="mut">Only the owner or a manager can link.</div>') + '</div>';
     body = contractorDetailsForm(c) + link;
   } else body = '<button class="btn ghost" style="margin:0 0 12px" data-act="neworder" data-cid="' + esc(c.id) + '">+ New work order</button>' + (mine.length ? mine.map(orderCard).join('') : '<div class="empty">No jobs for this contractor yet.</div>');
-  return msgHtml() + '<div class="card"><div class="row"><div><div class="title" style="font-size:20px">' + esc(c.name) + '</div><div class="mut">' + esc(c.contact_name || '') + '</div>' +
-    (c.phone ? '<div><a href="tel:' + esc(String(c.phone).replace(/[^\d+]/g, '')) + '">' + esc(c.phone) + '</a></div>' : '') + (c.email ? '<div><a href="mailto:' + esc(c.email) + '">' + esc(c.email) + '</a></div>' : '') + '</div>' +
+  return msgHtml() + '<div class="card"><div class="row"><div class="who"><div class="mono" aria-hidden="true">' + esc(initials(c.name)) + '</div><div><div class="title" style="font-size:20px">' + esc(c.name) + '</div><div class="mut">' + esc(c.contact_name || '') + '</div>' +
+    (c.phone ? '<div><a href="tel:' + esc(String(c.phone).replace(/[^\d+]/g, '')) + '">' + esc(c.phone) + '</a></div>' : '') + (c.email ? '<div><a href="mailto:' + esc(c.email) + '">' + esc(c.email) + '</a></div>' : '') + '</div></div>' +
     (c.link_status === 'active' ? pill('s-complete', 'Linked') : '') + '</div></div>' +
     '<div class="chips">' + chip('jobs', 'Jobs (' + mine.length + ')') + chip('invoices', 'Invoices (' + inv.length + ')') + chip('prices', 'Price list') + chip('details', 'Details') + '</div>' + body;
 }
@@ -606,7 +723,7 @@ function viewInvoice(o) {
   const editable = canBill() && (pr.status === 'rejected' || (pr.status === 'submitted' && manual));
   return msgHtml() + '<div class="card noprint"><div class="row" style="align-items:center"><div>' + pill('s-' + pr.status, PAY_LABEL[pr.status] || pr.status) + (!manual && pr.status !== 'paid' && pr.status !== 'rejected' ? '<div class="mut" style="margin-top:4px">The contractor updates this status.</div>' : '') + (pr.status === 'rejected' ? '<div class="mut" style="margin-top:4px">The contractor rejected this invoice. Fix it and resend.</div>' : '') + '</div>' +
     '<button class="link" data-act="open" data-id="' + esc(o.id) + '">Open work order</button></div>' +
-    '<div class="two"><button class="btn ghost" data-act="print">Print or save PDF</button>' + (editable ? '<button class="btn ghost" data-act="editinvoice"' + dis() + '>' + (pr.status === 'rejected' ? 'Fix and resend' : 'Edit') + '</button>' : '') + '</div>' +
+    '<div class="two"><button class="btn ghost" data-act="print">Print / PDF</button>' + (editable ? '<button class="btn ghost" data-act="editinvoice"' + dis() + '>' + (pr.status === 'rejected' ? 'Fix and resend' : 'Edit') + '</button>' : '') + '</div>' +
     (manual && canBill() && pr.status !== 'paid' && pr.status !== 'rejected' ? '<div class="two">' + (pr.status === 'submitted' ? '<button class="btn ghost" data-act="markpay" data-id="approved"' + dis() + '>Mark approved</button>' : '') + '<button class="btn ok" data-act="markpay" data-id="paid"' + dis() + '>Mark paid</button></div>' : '') + '</div>' + invoiceDoc(o, pr);
 }
 function viewAccount() {
@@ -623,7 +740,9 @@ function viewAccount() {
       (canBill() ? '<form data-form="invite"><label for="ir">Add a team member</label><select id="ir" name="role">' + roleOptions('laborer', owner ? ['laborer', 'project_manager', 'manager'] : ['laborer', 'project_manager']) + '</select><div class="mut" style="margin-top:6px">Crew see scheduled jobs and can mark them complete with photos. They never see pay. Project managers see everything but cannot invoice. Managers can also invoice and link contractors.</div><button class="btn ghost"' + dis() + '>Create join code</button></form>' : '') + '</div>' +
       (S.invites.length ? '<h2>Join codes waiting</h2>' + S.invites.map(i => '<div class="card"><div class="row" style="align-items:center"><div><div class="pay" style="letter-spacing:.1em;font-size:19px">' + esc(i.code) + '</div><div class="mut">' + esc(ROLE_LABEL[i.role]) + ' · expires ' + esc(fmtDate(String(i.expires_at).slice(0, 10))) + '</div></div><button class="link" data-act="cancelinvite" data-id="' + esc(i.id) + '">Cancel</button></div><div class="mut">They open this app, tap "Join your company with a code", and enter it.</div></div>').join('') : '');
   }
-  return msgHtml() + '<form data-form="account" class="card">' +
+  return msgHtml() + (owner ? '<div class="card"><div class="row" style="align-items:center"><div class="who">' + (logoUrl() ? '<img class="acctlogo" src="' + esc(logoUrl()) + '" alt="Your logo">' : '<div class="mono" aria-hidden="true">' + esc(initials(co.name)) + '</div>') + '<div><div class="title">' + esc(co.name) + '</div><div class="mut">Logo for invoices and work orders</div></div></div>' +
+      '<label class="link filebtn">' + (S.busy ? 'Uploading…' : logoUrl() ? 'Change' : 'Upload') + '<input type="file" accept="image/*" data-change="logo"' + dis() + '></label></div></div>' : '') +
+    '<form data-form="account" class="card">' +
     (owner ? field('ac', 'company', 'Company name', co.name, 'required') + field('aph', 'phone', 'Business phone', co.phone, 'type="tel"') + field('aem', 'email', 'Business email', co.email, 'type="email"') + field('aad', 'address', 'Business address', co.address) + '<div class="mut" style="margin-top:6px">These appear at the top of your invoices and work orders.</div>'
       : '<div class="title">' + esc(co.name || 'Your company') + '</div>') +
     field('an', 'display', 'Your name', S.profile.display_name, 'required') +
@@ -641,7 +760,7 @@ function viewDetail(o) {
       (S.form && S.form.declining ? '<form data-form="decline"><label for="rs">Reason (optional)</label><textarea id="rs" name="reason"></textarea><div class="two"><button type="button" class="btn ghost" data-act="canceldecline">Back</button><button class="btn bad"' + dis() + '>Confirm decline</button></div></form>'
         : '<div class="two"><button class="btn bad" data-act="decline"' + dis() + '>Decline</button><button class="btn ok" data-act="accept"' + dis() + '>Accept</button></div>') + '</div>';
   } else if (o.status === 'accepted') {
-    act = '<form data-form="complete" class="card noprint"><div class="title">Mark complete</div><label for="cp">Completion photos (at least one required)</label><input id="cp" name="photos" type="file" accept="image/*" multiple required>' +
+    act = '<form data-form="complete" class="card noprint"><div class="title">Mark complete</div><p class="mut" style="margin:4px 0 0">At least one photo of the finished work is required.</p><label class="btn ghost filebtn"><span id="cpn">Add completion photos</span><input name="photos" type="file" accept="image/*" multiple data-change="photos" aria-label="Completion photos"></label>' +
       '<label for="nt">Notes (optional)</label><textarea id="nt" name="notes"></textarea><button class="btn ok"' + dis() + '>' + (S.busy ? 'Working…' : 'Mark complete') + '</button></form>' +
       (mg && manual ? '<div class="two noprint" style="margin-bottom:12px"><button class="btn ghost" style="margin-top:0" data-act="editorder"' + dis() + '>Edit</button><button class="btn bad" style="margin-top:0" data-act="cancelorder"' + dis() + '>Cancel job</button></div>' : '');
   } else if (o.status === 'complete' && mg) {
@@ -656,9 +775,10 @@ function viewDetail(o) {
 }
 function render() {
   let h;
-  if (S.view === 'loading') h = '<main><div class="empty">Loading…</div></main>';
+  if (S.view === 'loading') h = '<div class="authwrap"><div class="brand"><div class="brandname">' + esc(APP_NAME) + '</div></div></div>';
   else if (S.view === 'auth') h = viewAuth();
   else if (S.view === 'onboard') h = viewOnboard();
+  else if (S.view === 'setup') h = viewSetup();
   else {
     const tabs = TABS(); if (!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
     const e = S.edit, o = S.detailId ? S.orders.find(x => String(x.id) === String(S.detailId)) : null, sub = e || o;
@@ -669,8 +789,8 @@ function render() {
     else if (e && e.kind === 'invoice' && o) { title = e.mode === 'edit' ? 'Invoice' : 'Invoice ' + ((payFor(o.id) || {}).invoice_number || ''); body = e.mode === 'edit' ? viewInvoiceEdit(o) : viewInvoice(o); }
     else if (o) { title = isMgmt() ? 'Work order' : 'Job'; body = viewDetail(o); }
     else { title = tabs.find(t => t[0] === S.tab)[2]; body = S.tab === 'orders' ? viewOrders() : S.tab === 'schedule' ? viewSchedule() : S.tab === 'billing' ? viewBilling() : S.tab === 'contractors' ? viewContractors() : viewAccount(); }
-    h = demoBar() + '<header>' + (sub ? '<button data-act="back" aria-label="Back">‹ Back</button>' : '') + '<h1>' + esc(title) + '</h1>' + (sub ? '' : '<button data-act="reload" aria-label="Refresh">↻</button>') + '</header><main>' + body + '</main>' +
-      '<nav aria-label="Sections"><div>' + tabs.map(t => '<button data-act="tab" data-id="' + t[0] + '" class="' + (!sub && S.tab === t[0] ? 'on' : '') + '"><b aria-hidden="true">' + t[1] + '</b>' + t[2] + '</button>').join('') + '</div></nav>';
+    h = demoBar() + '<header>' + (sub ? '<button class="hbtn" data-act="back" aria-label="Back">' + ICON.back + '</button>' : '') + '<h1>' + esc(title) + '</h1>' + (sub ? '' : '<button class="hbtn" data-act="reload" aria-label="Refresh">' + ICON.refresh + '</button>') + '</header><main>' + body + '</main>' +
+      '<nav aria-label="Sections"><div>' + tabs.map(t => '<button data-act="tab" data-id="' + t[0] + '" class="' + (!sub && S.tab === t[0] ? 'on' : '') + '"' + (!sub && S.tab === t[0] ? ' aria-current="page"' : '') + '>' + t[1] + '<span>' + t[2] + '</span></button>').join('') + '</div></nav>';
   }
   $app.innerHTML = h;
 }
@@ -695,18 +815,20 @@ function invoiceDraft(o) {
   if (!lines.length) lines = [{ desc: o.title || '', detail: '', qty: '1', unit: '', rate: (cents(pr ? pr.amount : o.pay_amount) / 100).toFixed(2) }];
   return { number: (pr && pr.invoice_number) || nextInvoiceNumber(), date: (pr && pr.invoice_date) || day(0), due: (pr && pr.due_terms) || 'On receipt', po: (pr && pr.po) || o.address || '', notes: (pr && pr.notes) || '', lines, saveRates: false };
 }
-async function enter() {                 // after a session exists: profile -> company setup if needed -> data
+async function enter() {                 // after a session exists: profile -> first-time setup if needed -> data
   await api.loadProfile();
   if (!S.profile) {
     const pend = getPending(); setPending(null);
-    if (pend && pend.display && (pend.mode === 'join' ? pend.code : pend.company)) {   // finish what sign-up started
-      try { if (pend.mode === 'join') await api.joinTeam(pend.code, pend.display); else await api.createCompany(pend.company, pend.display); await api.loadProfile(); }
+    if (pend && pend.mode === 'join' && pend.code && pend.display) {       // finish a join that sign-up started
+      try { await api.joinTeam(pend.code, pend.display); await api.loadProfile(); }
       catch (e) { S.form = pend; S.view = 'onboard'; flash('err', errText(e)); return; }
     }
-    if (!S.profile) { S.form = pend || {}; S.view = 'onboard'; return; }
+    if (!S.profile) { S.form = {}; S.setupStep = 1; S.view = 'setup'; return; }
   }
-  await api.loadData(); S.view = 'app'; S.tab = TABS()[0][0]; S.stack = []; S.edit = null; S.detailId = null;
+  if (role() === 'owner' && S.company && !S.company.setup_done) { S.setupStep = 2; S.view = 'setup'; return; }   // first login
+  await openApp();
 }
+async function openApp() { await api.loadData(); S.view = 'app'; S.tab = TABS()[0][0]; S.stack = []; S.edit = null; S.detailId = null; }
 async function run(fn, okText) {         // one place for busy state + error display
   if (S.busy) return; S.busy = true; S.msg = null; render();
   try { await fn(); if (okText) flash('good', okText); }
@@ -725,11 +847,17 @@ document.addEventListener('submit', ev => {
   const form = ev.target.closest('[data-form]'); if (!form) return; ev.preventDefault();
   const f = fields(form), kind = form.dataset.form, id = S.detailId, d = S.draft;
   if (kind === 'signin') run(async () => { await api.signIn(f.email, f.password); await enter(); });
-  else if (kind === 'signup') run(() => signUpFlow(f, { mode: 'new', company: f.company, display: f.display }));
+  else if (kind === 'signup') run(() => signUpFlow(f, null));
+  else if (kind === 'setup1') run(async () => {
+    S.form = f;
+    if (S.profile) await api.updateAccount({ company: f.company, display: f.display, phone: S.company.phone, email: S.company.email, address: S.company.address });
+    else await api.createCompany(f.company, f.display);
+    await api.loadProfile(); S.setupStep = 2;
+  });
+  else if (kind === 'setup3') run(async () => { await api.saveCompanyProfile({ phone: f.phone, email: f.email, address: f.address }); await api.loadProfile(); S.setupStep = 4; });
   else if (kind === 'joinsignup') run(() => signUpFlow(f, { mode: 'join', code: f.code, display: f.display }));
   else if (kind === 'forgot') run(async () => { await api.recover(f.email); S.authMode = 'signin'; }, 'If that email has an account, a reset link is on its way.');
   else if (kind === 'newpw') run(async () => { await api.setPassword(f.password); await enter(); }, 'Password saved.');
-  else if (kind === 'company') { S.form = Object.assign({}, S.form, f); run(async () => { await api.createCompany(f.company, f.display); await enter(); }); }
   else if (kind === 'join') { S.form = Object.assign({}, S.form, { code: f.code, display: f.display }); run(async () => { await api.joinTeam(f.code, f.display); await enter(); }); }
   else if (kind === 'account') run(async () => { await api.updateAccount(f); await api.loadProfile(); await api.loadData(); }, 'Saved.');
   else if (kind === 'invite') run(async () => { await api.createInvite(f.role); await api.loadData(); }, 'Join code created. Give it to your team member.');
@@ -780,6 +908,8 @@ document.addEventListener('change', ev => {
     S.draft[t.dataset.d] = t.value; if (t.dataset.d === 'contractor_id') render(); return;
   }
   const el = t.closest('[data-change]'); if (!el) return;
+  if (el.dataset.change === 'photos') { const n = el.files ? el.files.length : 0, sp = document.getElementById('cpn'); if (sp) sp.textContent = n ? n + ' photo' + (n > 1 ? 's' : '') + ' ready. Tap to change' : 'Add completion photos'; return; }
+  if (el.dataset.change === 'logo') { const file = el.files && el.files[0]; if (file) run(async () => { await api.uploadLogo(file); await api.loadProfile(); }, S.view === 'setup' ? null : 'Logo updated.'); return; }
   if (el.dataset.change === 'setrole') run(async () => { await api.setRole(el.dataset.id, el.value); await api.loadData(); }, 'Role updated.');
   else if (el.dataset.change === 'addsaved' && el.value && S.draft) {
     const i = S.saved.find(x => x.id === el.value); if (!i) return;
@@ -794,6 +924,11 @@ document.addEventListener('click', ev => {
   const a = b.dataset.act, id = b.dataset.id, cur = S.detailId ? S.orders.find(x => x.id === S.detailId) : null;
   if (a === 'authmode') { S.authMode = id; S.msg = null; }
   else if (a === 'confirmcontinue') return run(() => enter());
+  else if (a === 'tojoin') { S.view = 'onboard'; S.form = {}; S.msg = null; }
+  else if (a === 'tosetup') { S.view = 'setup'; S.setupStep = 1; S.msg = null; }
+  else if (a === 'setupnext') { S.setupStep = 3; S.msg = null; }
+  else if (a === 'setupback') { S.setupStep = Math.max(1, S.setupStep - 1); S.msg = null; }
+  else if (a === 'setupfinish') return run(async () => { await api.saveCompanyProfile({ setup_done: true }); await api.loadProfile(); await openApp(); if (id === 'contractor') go({ kind: 'contractor', id: null }); });
   else if (a === 'tab') { S.tab = id; S.stack = []; S.detailId = null; S.edit = null; S.draft = null; S.msg = null; S.form = null; }
   else if (a === 'filter') S.filter = id;
   else if (a === 'cview') { S.cview = id; S.msg = null; }
@@ -854,8 +989,10 @@ document.addEventListener('click', ev => {
       catch (e) { if (e.code === 'not_authenticated') saveSession(null); else { S.view = 'auth'; flash('err', errText(e)); render(); return; } }
     }
   } else if (/[?&]screen=confirmed\b/.test(location.search)) { S.session = { user: { id: 'demo', email: 'you@example.com' } }; S.view = 'auth'; S.authMode = 'confirmed'; render(); return; }
+  else if (/[?&]screen=setup\b/.test(location.search)) { S.session = { user: { id: 'demo', email: 'you@example.com' } }; S.form = {}; S.setupStep = 1; S.view = 'setup'; render(); return; }
   S.view = 'auth'; render();
 })();
+
 </script>
 </body>
 </html>
