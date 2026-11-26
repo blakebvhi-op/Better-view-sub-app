@@ -11,7 +11,12 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co; connect-src 'self' https://*.supabase.co; form-action 'none'; base-uri 'none'">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
-<title>Sub Portal</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Subbit</title>
 <style>
 /* Graphite and galvanized greys with one accent: the blue of a snapped chalk line. */
 :root{
@@ -40,7 +45,8 @@ main{flex:1;padding:8px 14px 104px}
 
 /* bottom nav */
 nav{position:fixed;bottom:0;left:0;right:0;z-index:5;background:rgba(255,255,255,.94);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);display:flex;justify-content:center}
-nav div{display:flex;width:100%;max-width:720px}
+nav .tabs{display:flex;width:100%;max-width:720px}
+.navbrand{display:none}
 nav button{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 2px 8px;border:0;background:none;color:var(--steel);font-size:11px;font-weight:500;cursor:pointer}
 nav button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 nav button.on{color:var(--chalk);font-weight:650}
@@ -152,8 +158,7 @@ table.lines tbody tr:nth-child(even){background:#f1f3f5}
 /* sign-in, email pages and first-time setup: graphite field with lap-siding lines, white sheet rising over it */
 .authwrap{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;background:var(--ink) repeating-linear-gradient(180deg,rgba(255,255,255,0) 0 27px,rgba(255,255,255,.055) 27px 28px)}
 .brand{padding:calc(46px + env(safe-area-inset-top)) 24px 30px;color:#fff}
-.brandname{font:700 40px/1 var(--disp);letter-spacing:-.01em}
-.brandname::after{content:"";display:block;width:44px;height:4px;border-radius:2px;background:var(--chalk);margin-top:12px;box-shadow:0 0 0 1px rgba(255,255,255,.08)}
+.brandname{display:flex;align-items:center;gap:8px;margin-left:-6px;font:700 42px/1 var(--disp);letter-spacing:-.01em}
 .brandsub{color:#aeb7c1;font-size:15px;margin-top:14px;max-width:30ch}
 .sheet{flex:1;background:var(--paper);border-radius:26px 26px 0 0;padding:26px 22px 40px}
 .sheeth{font:600 26px/1.15 var(--disp);margin:0 0 6px}
@@ -167,7 +172,35 @@ table.lines tbody tr:nth-child(even){background:#f1f3f5}
 .acctlogo{width:44px;height:44px;border-radius:12px;object-fit:contain;background:var(--mist);flex:none}
 .bigcheck{width:68px;height:68px;border-radius:50%;background:var(--ok-soft);color:var(--ok);font-size:36px;line-height:68px;margin:14px auto 12px}
 
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* working indicator and second-tap confirm */
+.busybar{position:absolute;left:0;right:0;bottom:0;height:3px;overflow:hidden;background:var(--chalk-soft)}
+.busybar::after{content:"";position:absolute;top:0;bottom:0;width:40%;border-radius:2px;background:var(--chalk);animation:slide 1s ease-in-out infinite}
+#app>.busybar{position:fixed;top:0;bottom:auto;z-index:9}
+@keyframes slide{from{left:-40%}to{left:100%}}
+.btn.armed{background:var(--bad);color:#fff}
+
+/* week view */
+.wday h2{margin:14px 2px 8px;display:flex;align-items:center;gap:8px}
+.wday.today h2{color:var(--chalk-d)}
+
+/* computers and tablets: navigation moves to the side, content gets a comfortable column */
+@media (min-width:900px){
+  #app{max-width:none;display:block}
+  nav{top:0;bottom:0;left:0;right:auto;width:232px;border-top:0;border-right:1px solid var(--line);background:var(--paper);padding:26px 14px;display:block}
+  nav .tabs{flex-direction:column;gap:4px;max-width:none}
+  .navbrand{display:flex;align-items:center;gap:8px;font:700 26px/1 var(--disp);letter-spacing:-.01em;padding:0 8px 22px}
+  nav button{flex:none;flex-direction:row;justify-content:flex-start;gap:12px;padding:11px 12px;border-radius:12px;font-size:15px}
+  nav button.on{background:var(--chalk-soft)}
+  .inapp header,.inapp main,.inapp .demo{margin-left:232px}
+  header{padding:22px 40px 12px}
+  header h1{font-size:32px}
+  .inapp main{padding:10px 40px 60px;max-width:860px}
+  .authwrap{margin:0;align-items:center;justify-content:center;padding:40px 20px;background-size:auto}
+  .authwrap .brand{width:100%;max-width:460px;padding:0 6px 26px}
+  .authwrap .sheet{flex:none;width:100%;max-width:460px;border-radius:26px;padding:30px 30px 34px}
+  .stats{max-width:560px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}.busybar::after{animation:none;width:100%;left:0}}
 @media print{header,nav,.demo,.noprint{display:none!important}body{background:#fff}main{padding:0}.doc{box-shadow:none;border-radius:0;padding:0}table.lines thead th,table.lines tbody tr{-webkit-print-color-adjust:exact;print-color-adjust:exact}table.lines tbody tr{break-inside:avoid}}
 </style>
 </head>
@@ -186,7 +219,7 @@ table.lines tbody tr:nth-child(even){background:#f1f3f5}
 
    Add ?demo=1 to the URL to open DEMO MODE (fake in-memory data, nothing saved).
    ===================================================================== */
-const APP_NAME = 'Sub Portal';           // working title — product name not chosen yet
+const APP_NAME = 'Subbit';
 const SB_URL   = 'https://uirtgwirsaddtolzahjx.supabase.co';
 const SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpcnRnd2lyc2FkZHRvbHphaGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU2MzY5MDcsImV4cCI6MjExMTIxMjkwN30.JaLclDcIKkuzdtSpI8sBRmnx5nSbP_tuem2lUfj8XH4'; // anon (public) key
 const PHOTO_BUCKET = 'wo-photos';
@@ -202,7 +235,7 @@ const SITE_URL = location.origin + location.pathname;
 const NOW = new Date();
 const S = { view: 'loading', setupStep: 1, authMode: 'signin', tab: 'contractors', stack: [], draft: null, cview: 'jobs', saved: [],
   filter: 'open', search: '', detailId: null, edit: null,
-  cal: { y: NOW.getFullYear(), m: NOW.getMonth() }, calDay: null,
+  cal: { y: NOW.getFullYear(), m: NOW.getMonth() }, calDay: null, calMode: 'month', weekStart: null,
   session: null, profile: null, company: null, orders: [], pays: [], contractors: [], team: [], invites: [],
   msg: null, busy: false, form: null };
 
@@ -220,6 +253,9 @@ function parseMoney(str, allowZero) {   // deterministic: digits, optional 1-2 d
 }
 const ymd = (y, m, d) => y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
 const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return ymd(d.getFullYear(), d.getMonth(), d.getDate()); };
+const pd = s => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s); return new Date(+m[1], +m[2] - 1, +m[3]); };
+const addDays = (s, n) => { const d = pd(s); d.setDate(d.getDate() + n); return ymd(d.getFullYear(), d.getMonth(), d.getDate()); };
+const weekOf = s => addDays(s, -pd(s).getDay());      // the Sunday that starts the week
 function fmtDate(d) {
   if (!d) return 'No date set';
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d); if (!m) return String(d);
@@ -387,9 +423,10 @@ const live = {
   saveOrder: (id, f) => sb.rpc('wo_save_manual', { p_id: id || null, p_contractor_id: f.contractor_id || null, p_title: f.title, p_address: f.address, p_scope: f.scope, p_line_items: f.line_items, p_pay_amount: f.payCents / 100, p_scheduled_date: f.scheduled_date || null }),
   cancelOrder: id => sb.rpc('wo_cancel_manual', { p_id: id }),
   respond: (id, accept, reason) => sb.rpc('wo_respond', { p_id: id, p_accept: accept, p_reason: reason || null }),
-  async complete(id, files, notes) {
+  async complete(id, files, notes, onProgress) {
     const photos = [];
     for (const f of files) {
+      if (onProgress) onProgress(photos.length + 1, files.length);
       const blob = await toJpeg(f);
       const path = S.profile.company_id + '/' + id + '/' + uuid() + '.jpg';
       await sb.req('/storage/v1/object/' + PHOTO_BUCKET + '/' + path, { method: 'POST', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
@@ -497,6 +534,7 @@ const ICON = {
   refresh: ico('<path d="M20 11a8 8 0 1 0-2.3 6.3"/><path d="M20 5v6h-6"/>'),
   chev: ico('<path d="M9 5l7 7-7 7"/>')
 };
+const LOGO = (fg, ac, size) => '<svg viewBox="0 0 96 96" width="' + size + '" height="' + size + '" aria-hidden="true"><path d="M57 69H22" fill="none" stroke="' + ac + '" stroke-width="12" stroke-linecap="round"/><path d="M70 27H39a10.5 10.5 0 0 0 0 21h18a10.5 10.5 0 0 1 0 21" fill="none" stroke="' + fg + '" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 const logoUrl = () => S.company && S.company.logo_path ? photoUrl({ path: S.company.logo_path }) : '';
 const TABS = () => isMgmt()
@@ -512,7 +550,8 @@ const dfield = (id, key, label, extra) => '<label for="' + id + '">' + label + '
 const roleOptions = (sel, list) => list.map(r => '<option value="' + r + '"' + (sel === r ? ' selected' : '') + '>' + ROLE_LABEL[r] + '</option>').join('');
 const pill = (cls, text) => '<span class="pill ' + cls + '">' + esc(text) + '</span>';
 
-const shell = (top, body) => demoBar() + '<div class="authwrap"><div class="brand"><div class="brandname">' + esc(APP_NAME) + '</div>' + top + '</div><main class="sheet">' + msgHtml() + body + '</main></div>';
+const busyBar = () => S.busy ? '<div class="busybar" role="progressbar" aria-label="Working"></div>' : '';
+const shell = (top, body) => demoBar() + busyBar() + '<div class="authwrap"><div class="brand"><div class="brandname">' + LOGO('#fff', '#4d83ff', 52) + esc(APP_NAME) + '</div>' + top + '</div><main class="sheet">' + msgHtml() + body + '</main></div>';
 function viewAuth() {
   const m = S.authMode, d = DEMO;
   const email = field('em', 'email', 'Email', d ? 'you@example.com' : '', 'type="email" autocomplete="email" required');
@@ -639,9 +678,23 @@ function viewOrderForm() {
     '<button class="btn"' + dis() + '>Save work order</button></form>';
 }
 function viewSchedule() {
-  const { y, m } = S.cal, first = new Date(y, m, 1), lead = first.getDay(), days = new Date(y, m + 1, 0).getDate(), today = day(0);
-  const by = {};
+  const today = day(0), by = {}, week = S.calMode === 'week';
   S.orders.filter(o => ['sent', 'accepted', 'complete'].includes(o.status) && o.scheduled_date).forEach(o => { const k = String(o.scheduled_date).slice(0, 10); (by[k] = by[k] || []).push(o); });
+  const mode = '<div class="chips"><button data-act="calmode" data-id="month" class="' + (week ? '' : 'on') + '" aria-pressed="' + !week + '">Month</button><button data-act="calmode" data-id="week" class="' + (week ? 'on' : '') + '" aria-pressed="' + week + '">Week</button></div>';
+  const head = (label, unit) => '<div class="row" style="align-items:center;margin-bottom:8px"><button class="link" data-act="calnav" data-id="-1" aria-label="Previous ' + unit + '">‹ Prev</button><div class="title">' + esc(label) + '</div><button class="link" data-act="calnav" data-id="1" aria-label="Next ' + unit + '">Next ›</button></div>';
+  if (week) {
+    const ws = S.weekStart || weekOf(today), we = addDays(ws, 6), a = pd(ws), b = pd(we);
+    const label = a.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' to ' + b.toLocaleDateString('en-US', a.getMonth() === b.getMonth() ? { day: 'numeric' } : { month: 'short', day: 'numeric' }) + ', ' + b.getFullYear();
+    let days = '';
+    for (let n = 0; n < 7; n++) {
+      const k = addDays(ws, n), list = by[k] || [];
+      days += '<div class="wday' + (k === today ? ' today' : '') + '"><div class="row" style="align-items:center"><h2>' + esc(pd(k).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })) + (k === today ? ' ' + pill('s-accepted', 'Today') : '') + '</h2>' +
+        (isMgmt() ? '<button class="link" data-act="neworder" data-date="' + k + '" aria-label="Add a work order on ' + esc(fmtDate(k)) + '">+ Add</button>' : '') + '</div>' +
+        (list.length ? list.map(orderCard).join('') : '<div class="mut" style="padding:0 2px 6px">Nothing scheduled.</div>') + '</div>';
+    }
+    return msgHtml() + mode + '<div class="card" style="padding-bottom:6px">' + head(label, 'week') + '</div>' + days;
+  }
+  const { y, m } = S.cal, first = new Date(y, m, 1), lead = first.getDay(), days = new Date(y, m + 1, 0).getDate();
   let cells = ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => '<div class="dow" aria-hidden="true">' + d + '</div>').join('') + '<div></div>'.repeat(lead);
   for (let d = 1; d <= days; d++) {
     const k = ymd(y, m, d), n = (by[k] || []).length;
@@ -656,7 +709,7 @@ function viewSchedule() {
     const open = S.orders.filter(o => o.status === 'sent' || o.status === 'accepted').sort(byDate);
     below = '<h2>Coming up</h2>' + (open.length ? open.map(orderCard).join('') : '<div class="mut" style="padding:4px 2px">Nothing scheduled.</div>');
   }
-  return msgHtml() + '<div class="card"><div class="row" style="align-items:center;margin-bottom:8px"><button class="link" data-act="calnav" data-id="-1" aria-label="Previous month">‹ Prev</button><div class="title">' + esc(first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })) + '</div><button class="link" data-act="calnav" data-id="1" aria-label="Next month">Next ›</button></div><div class="cal">' + cells + '</div></div>' + below;
+  return msgHtml() + mode + '<div class="card">' + head(first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), 'month') + '<div class="cal">' + cells + '</div></div>' + below;
 }
 function viewBilling() {
   const sum = st => S.pays.reduce((t, p) => t + (p.status === st ? cents(p.amount) : 0), 0);
@@ -687,8 +740,8 @@ function viewContractor() {
     (items.length ? items.map(itemCard).join('') : '<div class="mut" style="padding:4px 2px 10px">Nothing saved for this contractor yet.</div>') + (general.length ? '<h2>Saved for every contractor</h2>' + general.map(itemCard).join('') : '');
   else if (v === 'details') {
     let link;
-    if (c.link_status === 'active') link = '<div class="card"><div class="title">Linked' + (c.linked_name ? ' to ' + esc(c.linked_name) : '') + '</div><p class="mut">This contractor can send work orders straight into your account and sees your responses, completion photos and invoices.</p><button class="btn bad" data-act="unlink"' + dis() + '>Unlink</button></div>';
-    else if (c.link_status === 'pending' && c.link_code) link = '<div class="card"><div class="title">Link code</div><div class="pay" style="letter-spacing:.12em;margin:6px 0">' + esc(c.link_code) + '</div><p class="mut">Give this code to your contractor. They enter it in their system (for example Better View Pro). It works once and expires ' + esc(fmtDate(String(c.link_code_expires || '').slice(0, 10))) + '.</p><div class="two"><button class="btn bad" data-act="unlink"' + dis() + '>Cancel code</button><button class="btn ghost" data-act="reload"' + dis() + '>Check status</button></div></div>';
+    if (c.link_status === 'active') link = '<div class="card"><div class="title">Linked' + (c.linked_name ? ' to ' + esc(c.linked_name) : '') + '</div><p class="mut">This contractor can send work orders straight into your account and sees your responses, completion photos and invoices.</p><button class="btn bad" data-act="unlink" data-confirm="Yes, unlink"' + dis() + '>Unlink</button></div>';
+    else if (c.link_status === 'pending' && c.link_code) link = '<div class="card"><div class="title">Link code</div><div class="pay" style="letter-spacing:.12em;margin:6px 0">' + esc(c.link_code) + '</div><p class="mut">Give this code to your contractor. They enter it in their system (for example Better View Pro). It works once and expires ' + esc(fmtDate(String(c.link_code_expires || '').slice(0, 10))) + '.</p><div class="two"><button class="btn bad" data-act="unlink" data-confirm="Yes, cancel code"' + dis() + '>Cancel code</button><button class="btn ghost" data-act="reload"' + dis() + '>Check status</button></div></div>';
     else link = '<div class="card"><div class="title">Link this contractor</div><p class="mut">If this contractor uses Better View Pro, linking lets them send work orders straight to you. You create a code and give it to them.</p>' + (canBill() ? '<button class="btn" data-act="linkcode"' + dis() + '>Create link code</button>' : '<div class="mut">Only the owner or a manager can link.</div>') + '</div>';
     body = contractorDetailsForm(c) + link;
   } else body = '<button class="btn ghost" style="margin:0 0 12px" data-act="neworder" data-cid="' + esc(c.id) + '">+ New work order</button>' + (mine.length ? mine.map(orderCard).join('') : '<div class="empty">No jobs for this contractor yet.</div>');
@@ -704,7 +757,7 @@ function viewSavedForm() {
     '<label for="sd">Usual details (optional)</label><textarea id="sd" name="detail" style="min-height:60px">' + esc(i.detail) + '</textarea>' +
     '<div class="two"><div style="flex:1">' + field('sr', 'rate', 'Rate $', i.rate != null ? (cents(i.rate) / 100).toFixed(2) : '', 'inputmode="decimal" required') + '</div><div style="flex:1">' + field('su', 'unit', 'Unit', i.unit, 'placeholder="sq, lf, ea"') + '</div></div>' +
     '<label class="check"><input type="checkbox" name="all" value="1"' + (all ? ' checked' : '') + '> Use for every contractor, not just ' + esc(c.name || 'this one') + '</label>' +
-    '<button class="btn"' + dis() + '>Save item</button></form>' + (S.edit.id ? '<button class="btn bad" data-act="delsaved"' + dis() + '>Delete item</button>' : '');
+    '<button class="btn"' + dis() + '>Save item</button></form>' + (S.edit.id ? '<button class="btn bad" data-act="delsaved" data-confirm="Yes, delete"' + dis() + '>Delete item</button>' : '');
 }
 function viewInvoiceEdit(o) {
   const c = contractor(o.contractor_id) || {}, manual = o.source === 'manual';
@@ -762,7 +815,7 @@ function viewDetail(o) {
   } else if (o.status === 'accepted') {
     act = '<form data-form="complete" class="card noprint"><div class="title">Mark complete</div><p class="mut" style="margin:4px 0 0">At least one photo of the finished work is required.</p><label class="btn ghost filebtn"><span id="cpn">Add completion photos</span><input name="photos" type="file" accept="image/*" multiple data-change="photos" aria-label="Completion photos"></label>' +
       '<label for="nt">Notes (optional)</label><textarea id="nt" name="notes"></textarea><button class="btn ok"' + dis() + '>' + (S.busy ? 'Working…' : 'Mark complete') + '</button></form>' +
-      (mg && manual ? '<div class="two noprint" style="margin-bottom:12px"><button class="btn ghost" style="margin-top:0" data-act="editorder"' + dis() + '>Edit</button><button class="btn bad" style="margin-top:0" data-act="cancelorder"' + dis() + '>Cancel job</button></div>' : '');
+      (mg && manual ? '<div class="two noprint" style="margin-bottom:12px"><button class="btn ghost" style="margin-top:0" data-act="editorder"' + dis() + '>Edit</button><button class="btn bad" style="margin-top:0" data-act="cancelorder" data-confirm="Yes, cancel job"' + dis() + '>Cancel job</button></div>' : '');
   } else if (o.status === 'complete' && mg) {
     if (pr) act = '<div class="card noprint"><div class="row" style="align-items:center"><div><div class="title">Invoice ' + esc(pr.invoice_number || '') + '</div><div class="pay">' + money(cents(pr.amount)) + '</div></div>' + pill('s-' + pr.status, PAY_LABEL[pr.status] || pr.status) + '</div><button class="btn ghost" data-act="openinvoice" data-id="' + esc(o.id) + '">View invoice</button></div>';
     else if (canBill()) act = '<div class="card noprint"><div class="title">Ready to invoice</div><p class="mut" style="margin:4px 0 0">The invoice starts from this work order’s line items and your saved rates.</p><button class="btn" data-act="editinvoice">Create invoice</button></div>';
@@ -775,7 +828,7 @@ function viewDetail(o) {
 }
 function render() {
   let h;
-  if (S.view === 'loading') h = '<div class="authwrap"><div class="brand"><div class="brandname">' + esc(APP_NAME) + '</div></div></div>';
+  if (S.view === 'loading') h = '<div class="authwrap"><div class="brand"><div class="brandname">' + LOGO('#fff', '#4d83ff', 52) + esc(APP_NAME) + '</div></div></div>';
   else if (S.view === 'auth') h = viewAuth();
   else if (S.view === 'onboard') h = viewOnboard();
   else if (S.view === 'setup') h = viewSetup();
@@ -789,9 +842,10 @@ function render() {
     else if (e && e.kind === 'invoice' && o) { title = e.mode === 'edit' ? 'Invoice' : 'Invoice ' + ((payFor(o.id) || {}).invoice_number || ''); body = e.mode === 'edit' ? viewInvoiceEdit(o) : viewInvoice(o); }
     else if (o) { title = isMgmt() ? 'Work order' : 'Job'; body = viewDetail(o); }
     else { title = tabs.find(t => t[0] === S.tab)[2]; body = S.tab === 'orders' ? viewOrders() : S.tab === 'schedule' ? viewSchedule() : S.tab === 'billing' ? viewBilling() : S.tab === 'contractors' ? viewContractors() : viewAccount(); }
-    h = demoBar() + '<header>' + (sub ? '<button class="hbtn" data-act="back" aria-label="Back">' + ICON.back + '</button>' : '') + '<h1>' + esc(title) + '</h1>' + (sub ? '' : '<button class="hbtn" data-act="reload" aria-label="Refresh">' + ICON.refresh + '</button>') + '</header><main>' + body + '</main>' +
-      '<nav aria-label="Sections"><div>' + tabs.map(t => '<button data-act="tab" data-id="' + t[0] + '" class="' + (!sub && S.tab === t[0] ? 'on' : '') + '"' + (!sub && S.tab === t[0] ? ' aria-current="page"' : '') + '>' + t[1] + '<span>' + t[2] + '</span></button>').join('') + '</div></nav>';
+    h = demoBar() + '<header>' + (sub ? '<button class="hbtn" data-act="back" aria-label="Back">' + ICON.back + '</button>' : '') + '<h1>' + esc(title) + '</h1>' + (sub ? '' : '<button class="hbtn" data-act="reload" aria-label="Refresh">' + ICON.refresh + '</button>') + busyBar() + '</header><main>' + body + '</main>' +
+      '<nav aria-label="Sections"><div class="navbrand">' + LOGO('#16191d', '#1f5ae0', 34) + esc(APP_NAME) + '</div><div class="tabs">' + tabs.map(t => '<button data-act="tab" data-id="' + t[0] + '" class="' + (!sub && S.tab === t[0] ? 'on' : '') + '"' + (!sub && S.tab === t[0] ? ' aria-current="page"' : '') + '>' + t[1] + '<span>' + t[2] + '</span></button>').join('') + '</div></nav>';
   }
+  $app.className = S.view === 'app' ? 'inapp' : '';
   $app.innerHTML = h;
 }
 
@@ -888,7 +942,7 @@ document.addEventListener('submit', ev => {
     await api.loadData(); S.draft = null; S.edit = { kind: 'invoice', mode: 'view' };
   }, 'Invoice saved.');
   else if (kind === 'decline') run(async () => { await api.respond(id, false, f.reason); S.form = null; await api.loadData(); }, 'Declined. The contractor will see your response.');
-  else if (kind === 'complete') { const files = [...form.querySelector('[name=photos]').files]; run(async () => { if (!files.length) throw appErr('photo_required'); await api.complete(id, files, f.notes); await api.loadData(); }, 'Marked complete.'); }
+  else if (kind === 'complete') { const files = [...form.querySelector('[name=photos]').files]; run(async () => { if (!files.length) throw appErr('photo_required'); await api.complete(id, files, f.notes, (i, n) => { const b = document.querySelector('[data-form=complete] .btn.ok'); if (b) b.textContent = 'Uploading photo ' + i + ' of ' + n + '…'; }); await api.loadData(); }, 'Marked complete.'); }
 });
 document.addEventListener('input', ev => {            // typing never redraws the screen; it only updates state and totals
   const t = ev.target;
@@ -920,7 +974,10 @@ document.addEventListener('change', ev => {
   }
 });
 document.addEventListener('click', ev => {
-  const b = ev.target.closest('[data-act]'); if (!b || b.disabled) return;
+  const b = ev.target.closest('[data-act]');
+  document.querySelectorAll('.armed').forEach(x => { if (x !== b) { x.classList.remove('armed'); x.textContent = x.dataset.label; } });
+  if (!b || b.disabled) return;
+  if (b.dataset.confirm && !b.classList.contains('armed')) { b.dataset.label = b.textContent; b.textContent = b.dataset.confirm; b.classList.add('armed'); return; }   // destructive: ask once
   const a = b.dataset.act, id = b.dataset.id, cur = S.detailId ? S.orders.find(x => x.id === S.detailId) : null;
   if (a === 'authmode') { S.authMode = id; S.msg = null; }
   else if (a === 'confirmcontinue') return run(() => enter());
@@ -952,6 +1009,8 @@ document.addEventListener('click', ev => {
     else flash('note', 'No lines match your price list yet. Lines need a quantity and the same item name as a saved item.');
   }
   else if (a === 'print') { window.print(); return; }
+  else if (a === 'calmode') { S.calMode = id; if (id === 'week') S.weekStart = weekOf(S.calDay || (S.cal.y === NOW.getFullYear() && S.cal.m === NOW.getMonth() ? day(0) : ymd(S.cal.y, S.cal.m, 1))); else { const w = pd(S.weekStart || day(0)); S.cal = { y: w.getFullYear(), m: w.getMonth() }; S.calDay = null; } }
+  else if (a === 'calnav' && S.calMode === 'week') S.weekStart = addDays(S.weekStart || weekOf(day(0)), 7 * Number(id));
   else if (a === 'calnav') { const d = new Date(S.cal.y, S.cal.m + Number(id), 1); S.cal = { y: d.getFullYear(), m: d.getMonth() }; S.calDay = null; }
   else if (a === 'calday') S.calDay = S.calDay === id ? null : id;
   else if (a === 'decline') S.form = { declining: true };
