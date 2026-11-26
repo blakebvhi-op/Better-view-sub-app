@@ -16,7 +16,22 @@
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Subbit</title>
+<title>Subbit: work orders and invoices for subcontractors</title>
+<meta name="description" content="Subbit is a simple app for subcontractors. Keep every contractor you work for on one card with their jobs, your price list and your invoices. Crews see the work, never the pay.">
+<link rel="canonical" href="https://subbitcrm.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Subbit">
+<meta property="og:title" content="Subbit: work orders and invoices for subcontractors">
+<meta property="og:description" content="Every contractor you work for on one card: their jobs, your price list, your invoices.">
+<meta property="og:url" content="https://subbitcrm.com/">
+<meta property="og:image" content="https://subbitcrm.com/icon-512.png">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Subbit","applicationCategory":"BusinessApplication","operatingSystem":"Web, iOS, Android","url":"https://subbitcrm.com/","description":"Work orders, scheduling and invoices for subcontractors.","publisher":{"@type":"Organization","name":"Sola Scriptura LLC"}}</script>
+<script>
+/* Signed-in users, invite links, email links and the demo skip the landing page and open the app directly. */
+(function(){var s=null;try{s=localStorage.getItem('subapp_session_v1')}catch(e){}
+if(s||/[?&](app|join|demo|screen)=/.test(location.search)||/access_token=|error_description=/.test(location.hash))document.documentElement.className+=' skip-landing';})();
+</script>
 <style>
 /* Graphite and galvanized greys with one accent: the blue of a snapped chalk line. */
 :root{
@@ -202,11 +217,124 @@ a.btn{text-decoration:none}
   .authwrap .sheet{flex:none;width:100%;max-width:460px;border-radius:26px;padding:30px 30px 34px}
   .stats{max-width:560px}
 }
+/* ---------- landing page (shown to visitors who are not signed in) ---------- */
+.skip-landing #landing{display:none}
+html:not(.skip-landing) #app{display:none}
+#landing{background:var(--paper);color:var(--ink)}
+.lp-wrap{max-width:1080px;margin:0 auto;padding:0 22px}
+.lp-top{background:var(--ink) repeating-linear-gradient(180deg,rgba(255,255,255,0) 0 27px,rgba(255,255,255,.055) 27px 28px);color:#fff}
+.lp-nav{display:flex;align-items:center;gap:14px;padding:18px 0}
+.lp-logo{display:flex;align-items:center;gap:6px;font:700 28px/1 var(--disp);letter-spacing:-.01em;margin-right:auto;color:#fff;text-decoration:none}
+.lp-nav a.in{color:#d5dbe2;font-weight:550;font-size:15px;text-decoration:none;padding:10px 4px}
+.lp-cta{display:inline-block;background:var(--chalk);color:#fff;text-decoration:none;font-weight:650;border-radius:14px;padding:14px 22px;font-size:16px}
+.lp-nav .lp-cta{padding:10px 16px;font-size:15px;border-radius:12px}
+.lp-hero{display:flex;gap:48px;align-items:flex-end;padding:38px 0 0}
+.lp-hero>div:first-child{flex:1 1 0;padding-bottom:64px}
+.lp-hero h1{font:700 clamp(40px,7vw,68px)/1.02 var(--disp);letter-spacing:-.02em;margin:0 0 18px;max-width:11ch}
+.lp-hero p{font-size:19px;line-height:1.5;color:#c3cad3;margin:0 0 28px;max-width:34ch}
+.lp-sub{display:block;margin-top:14px;font-size:14px;color:#9aa4b0}
+.lp-phone{flex:0 0 310px;background:#0b0d10;border-radius:38px 38px 0 0;padding:12px 12px 0;box-shadow:0 0 0 1px rgba(255,255,255,.08)}
+.lp-screen{background:var(--mist);border-radius:28px 28px 0 0;padding:16px 12px 0;height:440px;overflow:hidden;color:var(--ink)}
+.lp-screen .doc{margin:0;font-size:13px;padding:14px 12px}
+.lp-screen .doctitle{font-size:16px}.lp-screen .docmeta{font-size:12px}.lp-screen table.lines td{padding:8px}
+.lp-sec{padding:72px 0}
+.lp-sec h2{font:700 clamp(30px,4.6vw,44px)/1.08 var(--disp);letter-spacing:-.015em;color:var(--ink);margin:0 0 12px;max-width:20ch}
+.lp-lead{font-size:18px;color:var(--steel);max-width:52ch;margin:0 0 40px}
+.lp-feats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:36px 56px}
+.lp-feats h3{font:600 23px/1.2 var(--disp);margin:0 0 6px;padding-top:16px;border-top:3px solid var(--ink)}
+.lp-feats div:nth-child(1) h3{border-top-color:var(--chalk)}
+.lp-feats p{margin:0;color:var(--ink2);font-size:16px;line-height:1.55;max-width:44ch}
+.lp-steps{background:var(--mist)}
+.lp-steps ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;counter-reset:s}
+.lp-steps li{counter-increment:s}
+.lp-steps li::before{content:counter(s);display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--ink);color:#fff;font:700 20px/1 var(--disp);margin-bottom:14px}
+.lp-steps h3{font:600 22px/1.2 var(--disp);margin:0 0 6px}
+.lp-steps p{margin:0;color:var(--ink2);line-height:1.55}
+.lp-end{background:var(--ink);color:#fff;text-align:left}
+.lp-end h2{color:#fff}
+.lp-end p{color:#c3cad3;font-size:18px;max-width:46ch;margin:0 0 26px}
+.lp-foot{background:var(--ink);color:#8f99a5;font-size:14px;padding:22px 0 34px;border-top:1px solid rgba(255,255,255,.08)}
+.lp-foot .lp-wrap{display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between}
+.lp-foot a{color:#c3cad3}
+@media (max-width:820px){
+  .lp-hero{flex-direction:column;align-items:stretch;gap:8px}.lp-hero>div:first-child{padding-bottom:28px}
+  .lp-phone{flex:none;width:min(310px,86%);margin:0 auto}.lp-screen{height:330px}
+  .lp-feats,.lp-steps ol{grid-template-columns:1fr}.lp-sec{padding:52px 0}
+  .lp-nav a.in{display:none}
+}
+@media print{#landing{display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}.busybar::after{animation:none;width:100%;left:0}}
 @media print{header,nav,.demo,.noprint{display:none!important}body{background:#fff}main{padding:0}.doc{box-shadow:none;border-radius:0;padding:0}table.lines thead th,table.lines tbody tr{-webkit-print-color-adjust:exact;print-color-adjust:exact}table.lines tbody tr{break-inside:avoid}}
 </style>
 </head>
 <body>
+<div id="landing">
+<div class="lp-top">
+  <div class="lp-wrap">
+    <div class="lp-nav" role="navigation" aria-label="Subbit">
+      <a class="lp-logo" href="./"><svg viewBox="0 0 96 96" width="38" height="38" aria-hidden="true"><path d="M57 69H22" fill="none" stroke="#4d83ff" stroke-width="12" stroke-linecap="round"/><path d="M70 27H39a10.5 10.5 0 0 0 0 21h18a10.5 10.5 0 0 1 0 21" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></svg>Subbit</a>
+      <a class="in" href="?app=signin">Sign in</a>
+      <a class="lp-cta" href="?app=signup">Create account</a>
+    </div>
+    <div class="lp-hero">
+      <div>
+        <h1>The job app for subcontractors.</h1>
+        <p>Every contractor you work for gets one card. Their jobs, your price list and your invoices all live on it.</p>
+        <a class="lp-cta" href="?app=signup">Create your account</a>
+        <span class="lp-sub">Works on your phone and your computer. Nothing to install.</span>
+      </div>
+      <div class="lp-phone" aria-hidden="true">
+        <div class="lp-screen">
+          <div class="doc">
+            <div class="dochead"><div><div class="doctitle">Your Company LLC</div><div class="mut">555-0199</div></div><div class="docmeta"><b>WORK ORDER</b><span>Date</span><div>Tue, Dec 1</div></div></div>
+            <div class="lbl">For</div><div class="doctitle" style="font-size:15px;margin-bottom:8px">Example Builders</div>
+            <table class="lines"><thead><tr><th>Description</th><th class="n">Qty</th></tr></thead><tbody>
+            <tr><td><b>Gutters and downspouts</b><div class="det">148' gutters
+40' downs</div></td><td class="n">188 lf</td></tr>
+            <tr><td><b>Window wrap</b><div class="det">All front windows</div></td><td class="n">17 ea</td></tr>
+            <tr><td>Vented soffit</td><td class="n">82 lf</td></tr>
+            <tr><td>Material pick up</td><td class="n">1 ea</td></tr>
+            </tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div role="main">
+<section class="lp-sec"><div class="lp-wrap">
+  <h2>Built around how subs actually get paid.</h2>
+  <p class="lp-lead">You do the work, prove it is done, and bill the contractor. Subbit keeps those three things in one place.</p>
+  <div class="lp-feats">
+    <div><h3>One card per contractor</h3><p>Open a contractor and see every job you have done for them, every invoice you have sent, and what they still owe you.</p></div>
+    <div><h3>Work orders your crew can read</h3><p>Each work order is laid out like an invoice, with items, details and quantities. It has no prices on it, so you can hand it to anyone on the job.</p></div>
+    <div><h3>A price list for each contractor</h3><p>Save the items you do and what you charge that contractor. Add them to a work order or an invoice in one tap.</p></div>
+    <div><h3>Invoices that write themselves</h3><p>When a job is complete, the invoice starts from the work order and fills in your saved rates. Print it, save it as a PDF, or download it for QuickBooks.</p></div>
+    <div><h3>Photos before the job closes</h3><p>A job cannot be marked complete without at least one photo of the finished work, so you always have proof when it is time to bill.</p></div>
+    <div><h3>The right view for each person</h3><p>Crew see the schedule and the work, and can mark jobs complete. They never see pay or rates. Managers see everything.</p></div>
+  </div>
+</div></section>
+
+<section class="lp-sec lp-steps"><div class="lp-wrap">
+  <h2>From first job to paid invoice.</h2>
+  <p class="lp-lead">Setting up takes a few minutes.</p>
+  <ol>
+    <li><h3>Add a contractor</h3><p>Create your company, add your logo, then add the contractors you work for.</p></li>
+    <li><h3>Build the work order</h3><p>Pick items from your price list, set the date, and it is on the schedule for you and your crew.</p></li>
+    <li><h3>Complete and invoice</h3><p>Add photos, mark it complete, and send the invoice. Track it until it is paid.</p></li>
+  </ol>
+</div></section>
+
+<section class="lp-sec lp-end"><div class="lp-wrap">
+  <h2>Stop rebuilding the same invoice.</h2>
+  <p>Set up your company and your first contractor today.</p>
+  <a class="lp-cta" href="?app=signup">Create your account</a>
+</div></section>
+</div>
+
+<footer class="lp-foot"><div class="lp-wrap"><span>© 2026 Sola Scriptura LLC</span><span><a href="?app=signin">Sign in</a></span></div></footer>
+</div>
 <div id="app"></div>
 <script>
 'use strict';
@@ -549,6 +677,46 @@ const TABS = () => isMgmt()
   ? [['contractors', ICON.contractors, 'Contractors'], ['orders', ICON.orders, 'Work orders'], ['schedule', ICON.schedule, 'Schedule'], ['billing', ICON.billing, 'Invoices'], ['account', ICON.account, 'Account']]
   : [['orders', ICON.orders, 'Jobs'], ['schedule', ICON.schedule, 'Schedule'], ['account', ICON.account, 'Account']];
 
+/* ---------- accounting export: one row per invoice line, as a CSV file the accounting program imports ---------- */
+const EXPORT_FORMATS = { qbo: 'QuickBooks Online', xero: 'Xero', csv: 'Spreadsheet (Excel, Google Sheets, others)' };
+const csvCell = v => { const t = String(v == null ? '' : v); return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+const usDate = d => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || ''); return m ? m[2] + '/' + m[3] + '/' + m[1] : ''; };
+function dueDate(pr) {                    // "Net 30" style terms add days; anything else is due on the invoice date
+  const base = String(pr.invoice_date || day(0)).slice(0, 10), m = /net\s*(\d{1,3})/i.exec(pr.due_terms || '');
+  return m ? addDays(base, Number(m[1])) : base;
+}
+function exportRows(opt) {                // invoices in the date range and status filter, oldest first
+  return S.orders.map(o => ({ o, pr: payFor(o.id) })).filter(x => x.pr && x.pr.status !== 'rejected')
+    .filter(x => { const d = String(x.pr.invoice_date || '').slice(0, 10); return (!opt.from || d >= opt.from) && (!opt.to || d <= opt.to); })
+    .filter(x => opt.status === 'all' || (opt.status === 'paid' ? x.pr.status === 'paid' : x.pr.status !== 'paid'))
+    .sort((a, b) => String(a.pr.invoice_date || '').localeCompare(String(b.pr.invoice_date || '')) || String(a.pr.invoice_number || '').localeCompare(String(b.pr.invoice_number || ''), 'en', { numeric: true }));
+}
+function buildExport(opt) {
+  const list = exportRows(opt), out = [];
+  const lines = x => Array.isArray(x.pr.line_items) && x.pr.line_items.length ? x.pr.line_items : [{ desc: x.o.title || 'Work completed', detail: '', qty: '1', unit: '', rate: (cents(x.pr.amount) / 100).toFixed(2) }];
+  const amt = c => (c / 100).toFixed(2), oneLine = t => String(t || '').replace(/\s*\n\s*/g, '; ');
+  if (opt.format === 'qbo') {
+    out.push(['InvoiceNo', 'Customer', 'InvoiceDate', 'DueDate', 'Terms', 'Memo', 'Item(Product/Service)', 'ItemDescription', 'ItemQuantity', 'ItemRate', 'ItemAmount']);
+    list.forEach(x => lines(x).forEach(l => out.push([x.pr.invoice_number, gcName(x.o), usDate(x.pr.invoice_date), usDate(dueDate(x.pr)), x.pr.due_terms, [x.o.title, x.pr.po].filter(Boolean).join(' / '), l.desc, oneLine(l.detail), l.qty, amt(parseMoney(l.rate, true) || 0), amt(lineCents(l))])));
+  } else if (opt.format === 'xero') {
+    out.push(['*ContactName', 'EmailAddress', 'POAddressLine1', 'POAddressLine2', 'POAddressLine3', 'POAddressLine4', 'POCity', 'PORegion', 'POPostalCode', 'POCountry', '*InvoiceNumber', 'Reference', '*InvoiceDate', '*DueDate', 'Total', 'InventoryItemCode', '*Description', '*Quantity', '*UnitAmount', 'Discount', '*AccountCode', '*TaxType', 'TaxAmount', 'TrackingName1', 'TrackingOption1', 'TrackingName2', 'TrackingOption2', 'Currency', 'BrandingTheme']);
+    list.forEach(x => { const c = contractor(x.o.contractor_id) || {}; lines(x).forEach(l => out.push([gcName(x.o), c.email, c.address, '', '', '', '', '', '', '', x.pr.invoice_number, x.pr.po || x.o.title, usDate(x.pr.invoice_date), usDate(dueDate(x.pr)), '', '', l.desc + (l.detail ? ' - ' + oneLine(l.detail) : ''), l.qty, amt(parseMoney(l.rate, true) || 0), '', opt.account, opt.tax, '', '', '', '', '', 'USD', ''])); });
+  } else {
+    out.push(['Invoice number', 'Invoice date', 'Due date', 'Status', 'Contractor', 'Job', 'PO or address', 'Item', 'Details', 'Qty', 'Unit', 'Rate', 'Amount', 'Invoice total']);
+    list.forEach(x => lines(x).forEach(l => out.push([x.pr.invoice_number, String(x.pr.invoice_date || '').slice(0, 10), dueDate(x.pr), PAY_LABEL[x.pr.status] || x.pr.status, gcName(x.o), x.o.title, x.pr.po, l.desc, oneLine(l.detail), l.qty, l.unit, amt(parseMoney(l.rate, true) || 0), amt(lineCents(l)), amt(cents(x.pr.amount))])));
+  }
+  return { count: list.length, rows: out.length - 1, text: out.map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n' };
+}
+function exportOptions() {
+  let saved = {}; try { saved = JSON.parse(localStorage.getItem('subapp_export_v1') || '{}'); } catch (_) {}
+  const t = day(0);
+  return { format: saved.format || 'qbo', status: 'all', from: addDays(t, -90), to: t, account: saved.account || '', tax: saved.tax || '' };
+}
+function downloadText(name, text) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' })); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
 /* ---------- views ---------- */
 const msgHtml = () => S.msg ? '<div class="msg ' + S.msg.kind + ' noprint" role="status">' + esc(S.msg.text) + '</div>' : '';
 const demoBar = () => DEMO ? '<div class="demo">DEMO MODE — sample data, nothing is saved</div>' : '';
@@ -577,7 +745,7 @@ function viewAuth() {
     form = '<form data-form="joinsignup"><p class="mut" style="margin:0">' + (iv ? 'You have been invited as ' + esc((ROLE_LABEL[iv.role] || iv.role).toLowerCase()) + '. Create your login to get started.' : 'Your owner or manager sends you an invite link or a code from their Account screen.') + '</p>' + field('jc', 'code', 'Invite code', S.joinCode, 'required autocapitalize="characters" autocomplete="off"') + field('dn', 'display', 'Your name', '', 'required') + email + pw() + '<button class="btn"' + dis() + '>Join my company</button></form>'; }
   else if (m === 'forgot') { head = 'Reset your password'; form = '<form data-form="forgot"><p class="mut" style="margin:0">We will email you a link to set a new password.</p>' + email + '<button class="btn"' + dis() + '>Send reset link</button></form>'; }
   else if (m === 'newpw') { head = 'Choose a new password'; links = ''; form = '<form data-form="newpw"><p class="mut" style="margin:0">For ' + esc(S.session && S.session.user.email) + '.</p>' + pw(true) + '<button class="btn"' + dis() + '>Save password</button></form>'; }
-  else { form = '<form data-form="signin">' + email + pw() + '<button class="btn"' + dis() + '>Sign in</button></form>'; links = link('signup', 'Start a new company account') + link('join', 'Join your company with an invite') + link('forgot', 'Forgot password?'); }
+  else { form = '<form data-form="signin">' + email + pw() + '<button class="btn"' + dis() + '>Sign in</button></form>'; links = link('signup', 'Start a new company account') + link('join', 'Join your company with an invite') + link('forgot', 'Forgot password?') + '<a class="link" href="./" data-home>What is ' + esc(APP_NAME) + '?</a>'; }
   return shell('<div class="brandsub">Work orders, scheduling and invoices for subcontractors.</div>', '<h1 class="sheeth">' + head + '</h1>' + form + '<div class="links">' + links + '</div>');
 }
 function viewOnboard() {                  // signed in, not in a company, and wants to join one
@@ -725,8 +893,22 @@ function viewBilling() {
   const ready = S.orders.filter(o => { const p = payFor(o.id); return o.status === 'complete' && (!p || p.status === 'rejected'); });
   const sent = S.orders.filter(o => payFor(o.id)).sort((a, b) => String(payFor(b.id).invoice_date || '').localeCompare(String(payFor(a.id).invoice_date || '')));
   return msgHtml() + '<div class="stats"><div class="card"><span class="mut">Sent</span><b>' + money(sum('submitted')) + '</b></div><div class="card"><span class="mut">Approved</span><b>' + money(sum('approved')) + '</b></div><div class="card"><span class="mut">Paid</span><b>' + money(sum('paid')) + '</b></div></div>' +
+    (S.pays.length ? '<button class="btn ghost" style="margin:6px 0 0" data-act="openexport">Export for accounting</button>' : '') +
     '<h2>Ready to invoice</h2>' + (ready.length ? ready.map(orderCard).join('') : '<div class="mut" style="padding:4px 2px 10px">Nothing waiting. Complete a work order to invoice it.</div>') +
     '<h2>Invoices</h2>' + (sent.length ? sent.map(invoiceCard).join('') : '<div class="mut" style="padding:4px 2px">None yet.</div>');
+}
+function viewExport() {
+  const d = S.draft, n = exportRows(d).length, sel = (k, v, t) => '<option value="' + v + '"' + (d[k] === v ? ' selected' : '') + '>' + t + '</option>';
+  const how = d.format === 'qbo' ? 'In QuickBooks Online: Settings (gear), Import data, Invoices, then choose this file. Tick the box to add new customers and products. Turn on "Custom transaction numbers" first to keep your invoice numbers. QuickBooks cannot import invoices this way if sales tax is set up in your account.'
+    : d.format === 'xero' ? 'In Xero: Sales, Invoices, Import, then choose this file. Invoices arrive as drafts for you to approve. The account code and tax type must match ones that exist in your Xero.'
+    : 'Opens in Excel or Google Sheets. Most accounting programs can import it by matching the columns.';
+  return msgHtml() + '<form data-form="export" class="card"><label for="xf">Accounting program</label><select id="xf" data-d="format">' + Object.keys(EXPORT_FORMATS).map(k => sel('format', k, EXPORT_FORMATS[k])).join('') + '</select>' +
+    '<div class="two"><div style="flex:1">' + dfield('xa', 'from', 'Invoices from', 'type="date"') + '</div><div style="flex:1">' + dfield('xb', 'to', 'To', 'type="date"') + '</div></div>' +
+    '<label for="xs">Which invoices</label><select id="xs" data-d="status">' + sel('status', 'all', 'All') + sel('status', 'unpaid', 'Not paid yet') + sel('status', 'paid', 'Paid') + '</select>' +
+    (d.format === 'xero' ? '<div class="two"><div style="flex:1">' + dfield('xc', 'account', 'Sales account code', 'required placeholder="e.g. 400"') + '</div><div style="flex:1">' + dfield('xt', 'tax', 'Tax type', 'required placeholder="e.g. Tax Exempt (0%)"') + '</div></div>' : '') +
+    '<p class="mut" style="margin:14px 0 0">' + n + ' invoice' + (n === 1 ? '' : 's') + ' in this range.</p>' +
+    '<button class="btn"' + (n ? '' : ' disabled') + '>Download file</button></form>' +
+    '<div class="card"><div class="title">How to bring it in</div><p class="mut" style="margin:6px 0 0">' + esc(how) + '</p></div>';
 }
 function viewContractors() {
   return msgHtml() + '<button class="btn ghost" style="margin:0 0 12px" data-act="newcontractor">+ Add contractor</button>' +
@@ -854,6 +1036,7 @@ function render() {
     let title, body;
     if (e && e.kind === 'order') { title = e.id ? 'Edit work order' : 'New work order'; body = viewOrderForm(); }
     else if (e && e.kind === 'contractor') { title = e.id ? 'Contractor' : 'Add contractor'; body = viewContractor(); }
+    else if (e && e.kind === 'export') { title = 'Export invoices'; body = viewExport(); }
     else if (e && e.kind === 'saved') { title = e.id ? 'Saved item' : 'New saved item'; body = viewSavedForm(); }
     else if (e && e.kind === 'invoice' && o) { title = e.mode === 'edit' ? 'Invoice' : 'Invoice ' + ((payFor(o.id) || {}).invoice_number || ''); body = e.mode === 'edit' ? viewInvoiceEdit(o) : viewInvoice(o); }
     else if (o) { title = isMgmt() ? 'Work order' : 'Job'; body = viewDetail(o); }
@@ -963,6 +1146,13 @@ document.addEventListener('submit', ev => {
     }
     await api.loadData(); S.draft = null; S.edit = { kind: 'invoice', mode: 'view' };
   }, 'Invoice saved.');
+  else if (kind === 'export') {
+    const r = buildExport(d);
+    if (!r.count) { flash('note', 'No invoices in that range.'); render(); return; }
+    try { localStorage.setItem('subapp_export_v1', JSON.stringify({ format: d.format, account: d.account, tax: d.tax })); } catch (_) {}
+    downloadText('subbit-invoices-' + d.format + '-' + d.from + '-to-' + d.to + '.csv', r.text);
+    flash('good', 'Downloaded ' + r.count + ' invoice' + (r.count === 1 ? '' : 's') + ' (' + r.rows + ' line' + (r.rows === 1 ? '' : 's') + ').'); render();
+  }
   else if (kind === 'decline') run(async () => { await api.respond(id, false, f.reason); S.form = null; await api.loadData(); }, 'Declined. The contractor will see your response.');
   else if (kind === 'complete') { const files = [...form.querySelector('[name=photos]').files]; run(async () => { if (!files.length) throw appErr('photo_required'); await api.complete(id, files, f.notes, (i, n) => { const b = document.querySelector('[data-form=complete] .btn.ok'); if (b) b.textContent = 'Uploading photo ' + i + ' of ' + n + '…'; }); await api.loadData(); }, 'Marked complete.'); }
 });
@@ -981,7 +1171,7 @@ document.addEventListener('change', ev => {
   const t = ev.target;
   if (S.draft && t.dataset.d) {
     if (t.type === 'checkbox') { S.draft[t.dataset.d] = t.checked; return; }
-    S.draft[t.dataset.d] = t.value; if (t.dataset.d === 'contractor_id') render(); return;
+    S.draft[t.dataset.d] = t.value; if (t.dataset.d === 'contractor_id' || (S.edit && S.edit.kind === 'export')) render(); return;
   }
   const el = t.closest('[data-change]'); if (!el) return;
   if (el.dataset.change === 'photos') { const n = el.files ? el.files.length : 0, sp = document.getElementById('cpn'); if (sp) sp.textContent = n ? n + ' photo' + (n > 1 ? 's' : '') + ' ready. Tap to change' : 'Add completion photos'; return; }
@@ -1012,6 +1202,7 @@ document.addEventListener('click', ev => {
   else if (a === 'filter') S.filter = id;
   else if (a === 'cview') { S.cview = id; S.msg = null; }
   else if (a === 'open') go(null, id);
+  else if (a === 'openexport') { go({ kind: 'export' }); S.draft = exportOptions(); }
   else if (a === 'openinvoice') go({ kind: 'invoice', mode: 'view' }, id);
   else if (a === 'editinvoice') { if (cur) { go({ kind: 'invoice', mode: 'edit' }, cur.id, S.edit && S.edit.kind === 'invoice'); S.draft = invoiceDraft(cur); } }
   else if (a === 'back') back();
@@ -1053,9 +1244,11 @@ document.addEventListener('click', ev => {
 });
 
 (async function boot() {
-  document.title = APP_NAME;
+  if (document.documentElement.classList.contains('skip-landing')) document.title = APP_NAME;   // the landing page keeps its own title
   render();
-  const qs = new URLSearchParams(location.search), jc = (qs.get('join') || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
+  const qs = new URLSearchParams(location.search), want = qs.get('app');
+  if (want) { qs.delete('app'); history.replaceState(null, '', location.pathname + (qs.toString() ? '?' + qs.toString() : '') + location.hash); if (want === 'signup' || want === 'join') S.authMode = want; }
+  const jc = (qs.get('join') || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
   if (jc) {                               // opened from an invite link
     qs.delete('join'); history.replaceState(null, '', location.pathname + (qs.toString() ? '?' + qs.toString() : '') + location.hash);
     S.joinCode = jc; S.authMode = 'join';

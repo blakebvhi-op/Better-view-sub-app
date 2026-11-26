@@ -2,7 +2,7 @@
   "name": "Subbit",
   "short_name": "Subbit",
   "description": "Work orders, scheduling and invoices for subcontractors.",
-  "start_url": "./",
+  "start_url": "./?app=signin",
   "scope": "./",
   "display": "standalone",
   "background_color": "#16191d",
