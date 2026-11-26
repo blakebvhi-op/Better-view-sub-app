@@ -26,7 +26,7 @@
 <meta property="og:url" content="https://subbitcrm.com/">
 <meta property="og:image" content="https://subbitcrm.com/icon-512.png">
 <meta name="twitter:card" content="summary">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Subbit","applicationCategory":"BusinessApplication","operatingSystem":"Web, iOS, Android","url":"https://subbitcrm.com/","description":"Work orders, scheduling and invoices for subcontractors.","publisher":{"@type":"Organization","name":"Sola Scriptura LLC"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Subbit","applicationCategory":"BusinessApplication","operatingSystem":"Web, iOS, Android","url":"https://subbitcrm.com/","description":"Work orders, scheduling and invoices for subcontractors.","publisher":{"@type":"Organization","name":"Sola Scriptura LLC","email":"support@subbitcrm.com"}}</script>
 <script>
 /* Signed-in users, invite links, email links and the demo skip the landing page and open the app directly. */
 (function(){var s=null;try{s=localStorage.getItem('subapp_session_v1')}catch(e){}
@@ -256,6 +256,8 @@ html:not(.skip-landing) #app{display:none}
 .lp-foot{background:var(--ink);color:#8f99a5;font-size:14px;padding:22px 0 34px;border-top:1px solid rgba(255,255,255,.08)}
 .lp-foot .lp-wrap{display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between}
 .lp-foot a{color:#c3cad3}
+.lp-links{display:flex;gap:18px;flex-wrap:wrap}
+.legal{font-size:13px;color:var(--steel);margin:12px 0 0}
 @media (max-width:820px){
   .lp-hero{flex-direction:column;align-items:stretch;gap:8px}.lp-hero>div:first-child{padding-bottom:28px}
   .lp-phone{flex:none;width:min(310px,86%);margin:0 auto}.lp-screen{height:330px}
@@ -328,12 +330,12 @@ html:not(.skip-landing) #app{display:none}
 
 <section class="lp-sec lp-end"><div class="lp-wrap">
   <h2>Stop rebuilding the same invoice.</h2>
-  <p>Set up your company and your first contractor today.</p>
+  <p>Set up your company and your first contractor today. Questions first? Email <a href="mailto:support@subbitcrm.com" style="color:#fff">support@subbitcrm.com</a>.</p>
   <a class="lp-cta" href="?app=signup">Create your account</a>
 </div></section>
 </div>
 
-<footer class="lp-foot"><div class="lp-wrap"><span>© 2026 Sola Scriptura LLC</span><span><a href="?app=signin">Sign in</a></span></div></footer>
+<footer class="lp-foot"><div class="lp-wrap"><span>© 2026 Sola Scriptura LLC</span><span class="lp-links"><a href="mailto:support@subbitcrm.com">support@subbitcrm.com</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="?app=signin">Sign in</a></span></div></footer>
 </div>
 <div id="app"></div>
 <script>
@@ -350,6 +352,7 @@ html:not(.skip-landing) #app{display:none}
    Add ?demo=1 to the URL to open DEMO MODE (fake in-memory data, nothing saved).
    ===================================================================== */
 const APP_NAME = 'Subbit';
+const SUPPORT_EMAIL = 'support@subbitcrm.com';
 const SB_URL   = 'https://uirtgwirsaddtolzahjx.supabase.co';
 const SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpcnRnd2lyc2FkZHRvbHphaGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU2MzY5MDcsImV4cCI6MjExMTIxMjkwN30.JaLclDcIKkuzdtSpI8sBRmnx5nSbP_tuem2lUfj8XH4'; // anon (public) key
 const PHOTO_BUCKET = 'wo-photos';
@@ -727,6 +730,7 @@ const roleOptions = (sel, list) => list.map(r => '<option value="' + r + '"' + (
 const pill = (cls, text) => '<span class="pill ' + cls + '">' + esc(text) + '</span>';
 
 const busyBar = () => S.busy ? '<div class="busybar" role="progressbar" aria-label="Working"></div>' : '';
+const LEGAL = '<p class="legal">By creating an account you agree to the <a href="terms.html" target="_blank" rel="noopener">Terms</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>';
 const shell = (top, body) => demoBar() + busyBar() + '<div class="authwrap"><div class="brand"><div class="brandname">' + LOGO('#fff', '#4d83ff', 52) + esc(APP_NAME) + '</div>' + top + '</div><main class="sheet">' + msgHtml() + body + '</main></div>';
 function viewAuth() {
   const m = S.authMode, d = DEMO;
@@ -740,12 +744,12 @@ function viewAuth() {
   } else if (m === 'checkemail') {
     head = 'Check your email';
     form = '<p>We sent a confirmation link to <b>' + esc(S.form && S.form.email) + '</b>. Tap it to confirm your email and finish setup.</p><p class="mut">Open the link on this same phone or computer. Nothing there? Check spam.</p>';
-  } else if (m === 'signup') { head = 'Create your account'; form = '<form data-form="signup"><p class="mut" style="margin:0">You will set up your company right after this.</p>' + email + pw() + '<button class="btn"' + dis() + '>Create account</button></form>'; }
+  } else if (m === 'signup') { head = 'Create your account'; form = '<form data-form="signup"><p class="mut" style="margin:0">You will set up your company right after this.</p>' + email + pw() + '<button class="btn"' + dis() + '>Create account</button>' + LEGAL + '</form>'; }
   else if (m === 'join') { const iv = S.invite; head = iv ? 'Join ' + iv.company_name : 'Join your company'; links = link('signin', 'Already have a Subbit login? Sign in');
-    form = '<form data-form="joinsignup"><p class="mut" style="margin:0">' + (iv ? 'You have been invited as ' + esc((ROLE_LABEL[iv.role] || iv.role).toLowerCase()) + '. Create your login to get started.' : 'Your owner or manager sends you an invite link or a code from their Account screen.') + '</p>' + field('jc', 'code', 'Invite code', S.joinCode, 'required autocapitalize="characters" autocomplete="off"') + field('dn', 'display', 'Your name', '', 'required') + email + pw() + '<button class="btn"' + dis() + '>Join my company</button></form>'; }
+    form = '<form data-form="joinsignup"><p class="mut" style="margin:0">' + (iv ? 'You have been invited as ' + esc((ROLE_LABEL[iv.role] || iv.role).toLowerCase()) + '. Create your login to get started.' : 'Your owner or manager sends you an invite link or a code from their Account screen.') + '</p>' + field('jc', 'code', 'Invite code', S.joinCode, 'required autocapitalize="characters" autocomplete="off"') + field('dn', 'display', 'Your name', '', 'required') + email + pw() + '<button class="btn"' + dis() + '>Join my company</button>' + LEGAL + '</form>'; }
   else if (m === 'forgot') { head = 'Reset your password'; form = '<form data-form="forgot"><p class="mut" style="margin:0">We will email you a link to set a new password.</p>' + email + '<button class="btn"' + dis() + '>Send reset link</button></form>'; }
   else if (m === 'newpw') { head = 'Choose a new password'; links = ''; form = '<form data-form="newpw"><p class="mut" style="margin:0">For ' + esc(S.session && S.session.user.email) + '.</p>' + pw(true) + '<button class="btn"' + dis() + '>Save password</button></form>'; }
-  else { form = '<form data-form="signin">' + email + pw() + '<button class="btn"' + dis() + '>Sign in</button></form>'; links = link('signup', 'Start a new company account') + link('join', 'Join your company with an invite') + link('forgot', 'Forgot password?') + '<a class="link" href="./" data-home>What is ' + esc(APP_NAME) + '?</a>'; }
+  else { form = '<form data-form="signin">' + email + pw() + '<button class="btn"' + dis() + '>Sign in</button></form>'; links = link('signup', 'Start a new company account') + link('join', 'Join your company with an invite') + link('forgot', 'Forgot password?') + '<a class="link" href="./" data-home>What is ' + esc(APP_NAME) + '?</a><a class="link" href="mailto:' + SUPPORT_EMAIL + '">Contact support</a>'; }
   return shell('<div class="brandsub">Work orders, scheduling and invoices for subcontractors.</div>', '<h1 class="sheeth">' + head + '</h1>' + form + '<div class="links">' + links + '</div>');
 }
 function viewOnboard() {                  // signed in, not in a company, and wants to join one
@@ -998,6 +1002,7 @@ function viewAccount() {
       : '<div class="title">' + esc(co.name || 'Your company') + '</div>') +
     field('an', 'display', 'Your name', S.profile.display_name, 'required') +
     '<div class="mut" style="margin-top:8px">' + esc(S.session.user.email) + ' · ' + esc(ROLE_LABEL[role()] || role()) + '</div><button class="btn ghost"' + dis() + '>Save</button></form>' + team +
+    '<h2>Help</h2><div class="card"><div class="title">Questions or a problem?</div><p class="mut" style="margin:4px 0 0">Email <a href="mailto:' + SUPPORT_EMAIL + '">' + SUPPORT_EMAIL + '</a> and we will get back to you.</p><p class="mut" style="margin:10px 0 0"><a href="terms.html" target="_blank" rel="noopener">Terms</a> · <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a></p></div>' +
     '<button class="btn ghost" data-act="signout">Sign out</button>';
 }
 function photoGrid(arr) {
