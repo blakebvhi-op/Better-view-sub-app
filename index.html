@@ -453,6 +453,7 @@ const ERR = {
   already_submitted: 'An invoice was already sent for this work order.',
   requester_required: 'Enter a name.',
   contractor_has_jobs: 'This contractor has jobs, so the card cannot be deleted.',
+  move_conflict: 'Those jobs could not be moved to that contractor. Pick a different one, or keep the jobs with no contractor.',
   not_found_or_linked: 'Payment status on a linked work order is set by the contractor.',
   '42501': 'Permission denied. Sign out and back in, then try again.',
   PGRST202: 'The database is not set up yet. Run the latest setup SQL, then try again.',
@@ -562,7 +563,7 @@ const live = {
   deleteItem: id => sb.rpc('saved_item_delete', { p_id: id }),
   saveContractor: (id, f) => sb.rpc('contractor_save', { p_id: id || null, p_name: f.name, p_contact_name: f.contact_name, p_phone: f.phone, p_email: f.email, p_address: f.address, p_notes: f.notes }),
   async contractorInvite(action) { const r = await sb.rpc('company_contractor_link', { p_action: action }); return r.token || null; },
-  deleteContractor: id => sb.rpc('contractor_delete', { p_id: id }),
+  deleteContractor: (id, moveTo) => sb.rpc('contractor_delete', { p_id: id, p_move_to: moveTo || null }),
   requestLinkSet: (id, action) => sb.rpc('contractor_request_link', { p_id: id, p_action: action }),
   createLinkCode: id => sb.rpc('contractor_create_link_code', { p_id: id }),
   revokeLink: id => sb.rpc('contractor_revoke_link', { p_id: id }),
@@ -653,7 +654,7 @@ const demo = {
   async deleteItem(id) { await wait(); demoDb.saved = demoDb.saved.filter(x => x.id !== id); },
   async saveContractor(id, f) { await wait(); if (!f.name) throw appErr('name_required'); const c = demoDb.contractors.find(x => x.id === id); if (c) Object.assign(c, f); else demoDb.contractors.push(Object.assign({ id: uuid(), link_status: 'manual' }, f)); },
   async contractorInvite(action) { await wait(); if (action === 'off') demoDb.cinvite = null; else if (action !== 'peek' && (action === 'new' || !demoDb.cinvite)) demoDb.cinvite = uuid().replace(/-/g, ''); return demoDb.cinvite || null; },
-  async deleteContractor(id) { await wait(); if (demoDb.orders.some(o => o.contractor_id === id)) throw appErr('contractor_has_jobs'); demoDb.contractors = demoDb.contractors.filter(c => c.id !== id); },
+  async deleteContractor(id, moveTo) { await wait(); if (moveTo && (moveTo === id || !demoDb.contractors.some(c => c.id === moveTo))) throw appErr('contractor_not_found'); demoDb.orders.forEach(o => { if (o.contractor_id !== id) return; if (moveTo) o.contractor_id = moveTo; else { if (o.status === 'sent') { o.status = 'declined'; o.decline_reason = 'Contractor removed'; } o.contractor_id = null; } }); demoDb.saved = (demoDb.saved || []).filter(i => i.contractor_id !== id); demoDb.contractors = demoDb.contractors.filter(c => c.id !== id); },
   async requestLinkSet(id, action) { await wait(); const c = demoDb.contractors.find(x => x.id === id); if (!c) throw appErr('not_found'); c.request_token = action === 'off' ? null : (action === 'new' || !c.request_token ? uuid().replace(/-/g, '') : c.request_token); },
   async createLinkCode(id) { await wait(); const c = demoDb.contractors.find(x => x.id === id); if (!c) throw appErr('not_found'); if (c.link_status === 'active') throw appErr('already_linked'); c.link_status = 'pending'; c.link_code = uuid().replace(/-/g, '').slice(0, 10).toUpperCase(); c.link_code_expires = day(7); },
   async revokeLink(id) { await wait(); const c = demoDb.contractors.find(x => x.id === id); if (!c || !['pending', 'active'].includes(c.link_status)) throw appErr('not_found'); c.link_status = 'revoked'; c.link_code = null; },
@@ -967,7 +968,12 @@ function viewContractor() {
     if (c.link_status === 'active') link = '<div class="card"><div class="title">Linked' + (c.linked_name ? ' to ' + esc(c.linked_name) : '') + '</div><p class="mut">This contractor can send work orders straight into your account and sees your responses, completion photos and invoices.</p><button class="btn bad" data-act="unlink" data-confirm="Yes, unlink"' + dis() + '>Unlink</button></div>';
     else if (c.link_status === 'pending' && c.link_code) link = '<div class="card"><div class="title">Link code</div><div class="pay" style="letter-spacing:.12em;margin:6px 0">' + esc(c.link_code) + '</div><p class="mut">Give this code to your contractor. They enter it in their system (for example Better View Pro). It works once and expires ' + esc(fmtDate(String(c.link_code_expires || '').slice(0, 10))) + '.</p><div class="two"><button class="btn bad" data-act="unlink" data-confirm="Yes, cancel code"' + dis() + '>Cancel code</button><button class="btn ghost" data-act="reload"' + dis() + '>Check status</button></div></div>';
     else link = '<div class="card"><div class="title">Link this contractor</div><p class="mut">If this contractor uses Better View Pro, linking lets them send work orders straight to you. You create a code and give it to them.</p>' + (canBill() ? '<button class="btn" data-act="linkcode"' + dis() + '>Create link code</button>' : '<div class="mut">Only the owner or a manager can link.</div>') + '</div>';
-    body = contractorDetailsForm(c) + link + (mine.length ? '' : '<button class="btn bad" data-act="delcontractor" data-confirm="Yes, delete this card"' + dis() + '>Delete contractor</button>');
+    const others = S.contractors.filter(x => x.id !== c.id).sort((a, b) => a.name.localeCompare(b.name)), nInv = inv.length;
+    const del = '<div class="card"><div class="title">Delete this card</div>' + (mine.length
+      ? '<p class="mut" style="margin:4px 0 0">' + esc(c.name) + ' has ' + mine.length + (mine.length === 1 ? ' job' : ' jobs') + (nInv ? ' and ' + nInv + (nInv === 1 ? ' invoice' : ' invoices') : '') + '. They are not deleted with the card.</p><label for="delmove">What happens to them</label><select id="delmove"><option value="">Keep them, with no contractor</option>' + others.map(x => '<option value="' + esc(x.id) + '">Move them to ' + esc(x.name) + '</option>').join('') + '</select>'
+      : '<p class="mut" style="margin:4px 0 0">This card has no jobs.</p>') +
+      '<p class="mut">The price list saved for this card is deleted, and any link you gave this contractor stops working.</p><button class="btn bad" data-act="delcontractor" data-confirm="Yes, delete this card"' + dis() + '>Delete contractor</button></div>';
+    body = contractorDetailsForm(c) + link + del;
   } else {
     let rq;
     if (c.request_token) {
@@ -1281,7 +1287,7 @@ document.addEventListener('click', ev => {
   else if (a === 'cinvite') return run(async () => { S.contractorInvite = await api.contractorInvite(id); }, id === 'off' ? 'Link turned off.' : id === 'new' ? 'New link made. The old one no longer works.' : 'Link created. Send it to your contractors.');
   else if (a === 'copycinvite') { copyText(joinLink(S.contractorInvite)).then(ok => { flash(ok ? 'good' : 'err', ok ? 'Link copied. Paste it into a text or email.' : 'Could not copy. Press and hold the link to copy it.'); render(); }); return; }
   else if (a === 'sharecinvite') { navigator.share({ title: 'Send jobs to ' + ((S.company && S.company.name) || 'us'), url: joinLink(S.contractorInvite) }).catch(() => {}); return; }
-  else if (a === 'delcontractor') return run(async () => { await api.deleteContractor(S.edit.id); await api.loadData(); back(); }, 'Contractor deleted.');
+  else if (a === 'delcontractor') { const mv = (document.getElementById('delmove') || {}).value || null; return run(async () => { await api.deleteContractor(S.edit.id, mv); await api.loadData(); back(); }, mv ? 'Card deleted. Its jobs were moved.' : 'Contractor deleted.'); }
   else if (a === 'requestlink') return run(async () => { await api.requestLinkSet(S.edit.id, id); await api.loadData(); }, id === 'off' ? 'Link turned off. The old link no longer works.' : id === 'new' ? 'New link made. The old one no longer works.' : 'Link created. Send it to your contractor.');
   else if (a === 'copyrequest' || a === 'sharerequest') {
     const c = contractor(S.edit.id), url = c && c.request_token ? requestLink(c.request_token) : '';
