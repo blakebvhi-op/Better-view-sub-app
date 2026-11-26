@@ -170,6 +170,8 @@ table.lines tbody tr:nth-child(even){background:#f1f3f5}
 .logodrop{display:grid;place-items:center;height:150px;margin:16px 0 4px;border-radius:18px;background:var(--mist)}
 .logodrop img{max-width:70%;max-height:110px;object-fit:contain}
 .acctlogo{width:44px;height:44px;border-radius:12px;object-fit:contain;background:var(--mist);flex:none}
+.linkbox{margin-top:12px;padding:11px 12px;border-radius:12px;background:var(--mist);font-size:14px;word-break:break-all;-webkit-user-select:all;user-select:all}
+a.btn{text-decoration:none}
 .bigcheck{width:68px;height:68px;border-radius:50%;background:var(--ok-soft);color:var(--ok);font-size:36px;line-height:68px;margin:14px auto 12px}
 
 /* working indicator and second-tap confirm */
@@ -231,9 +233,10 @@ const PENDING_KEY = 'subapp_pending_v2';
 const CONTRACTOR_COLS = 'id,company_id,name,contact_name,phone,email,address,notes,link_status,link_code,link_code_expires,linked_name,linked_at';
 const DEMO = !SB_URL || !SB_KEY || /[?&]demo=1\b/.test(location.search);
 const SITE_URL = location.origin + location.pathname;
+const inviteLink = code => SITE_URL + '?join=' + encodeURIComponent(code);
 
 const NOW = new Date();
-const S = { view: 'loading', setupStep: 1, authMode: 'signin', tab: 'contractors', stack: [], draft: null, cview: 'jobs', saved: [],
+const S = { view: 'loading', joinCode: '', invite: null, setupStep: 1, authMode: 'signin', tab: 'contractors', stack: [], draft: null, cview: 'jobs', saved: [],
   filter: 'open', search: '', detailId: null, edit: null,
   cal: { y: NOW.getFullYear(), m: NOW.getMonth() }, calDay: null, calMode: 'month', weekStart: null,
   session: null, profile: null, company: null, orders: [], pays: [], contractors: [], team: [], invites: [],
@@ -297,7 +300,7 @@ const ERR = {
   already_has_company: 'This login already belongs to a company.',
   company_name_required: 'Enter your company name.',
   display_name_required: 'Enter your name.',
-  invalid_team_code: 'That join code was not found, was already used, or has expired.',
+  invalid_team_code: 'That invite was not found, was already used, or has expired. Ask for a new one.',
   role_invalid: 'Pick a role.',
   logo_invalid: 'That logo could not be saved. Try uploading it again.',
   cannot_change_self: 'You cannot change your own role or remove yourself.',
@@ -403,6 +406,10 @@ const live = {
   },
   createCompany: (name, display) => sb.rpc('signup_create_company', { p_company_name: name, p_display_name: display }),
   joinTeam: (code, display) => sb.rpc('team_join', { p_code: code, p_display_name: display }),
+  async peekInvite(code) {             // no login needed: asks who the invite is from
+    const r = await fetch(SB_URL + '/rest/v1/rpc/team_invite_peek', { method: 'POST', headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_code: code }) });
+    const j = await r.json().catch(() => null); if (!r.ok) return null; if (j && j.error) throw appErr(j.error); return j;
+  },
   createInvite: r => sb.rpc('team_create_invite', { p_role: r }),
   cancelInvite: id => sb.rpc('team_cancel_invite', { p_id: id }),
   setRole: (uid, r) => sb.rpc('team_set_role', { p_user_id: uid, p_role: r }),
@@ -492,6 +499,7 @@ const demo = {
     S.orders = demoDb.orders.map(o => ({ ...o })); S.pays = demoDb.pays.map(p => ({ ...p })); S.contractors = demoDb.contractors.map(c => ({ ...c })).sort((a, b) => a.name.localeCompare(b.name)); S.saved = demoDb.saved.map(i => ({ ...i })).sort((a, b) => a.title.localeCompare(b.title));
   },
   async createCompany(name, display) { if (!name) throw appErr('company_name_required'); demoDb.user = { company: name, name: display, role: 'owner' }; },
+  async peekInvite(code) { await wait(); return { ok: true, company_name: 'Demo Subcontracting LLC', role: (demoDb.invites.find(i => i.code === code) || {}).role || 'laborer' }; },
   async joinTeam(code, display) { await wait(); if (!code) throw appErr('invalid_team_code'); demoDb.user = { company: 'Demo Subcontracting LLC', name: display || 'Crew Member', role: 'laborer', setup_done: true }; },
   async createInvite(r) { await wait(); if (!['manager', 'project_manager', 'laborer'].includes(r)) throw appErr('role_invalid'); demoDb.invites.unshift({ id: uuid(), role: r, code: uuid().replace(/-/g, '').slice(0, 10).toUpperCase(), expires_at: day(7) }); },
   async cancelInvite(id) { await wait(); demoDb.invites = demoDb.invites.filter(i => i.id !== id); },
@@ -565,15 +573,16 @@ function viewAuth() {
     head = 'Check your email';
     form = '<p>We sent a confirmation link to <b>' + esc(S.form && S.form.email) + '</b>. Tap it to confirm your email and finish setup.</p><p class="mut">Open the link on this same phone or computer. Nothing there? Check spam.</p>';
   } else if (m === 'signup') { head = 'Create your account'; form = '<form data-form="signup"><p class="mut" style="margin:0">You will set up your company right after this.</p>' + email + pw() + '<button class="btn"' + dis() + '>Create account</button></form>'; }
-  else if (m === 'join') { head = 'Join your company'; form = '<form data-form="joinsignup"><p class="mut" style="margin:0">Your owner or manager gives you a join code from their Account screen.</p>' + field('jc', 'code', 'Join code', '', 'required autocapitalize="characters" autocomplete="off"') + field('dn', 'display', 'Your name', '', 'required') + email + pw() + '<button class="btn"' + dis() + '>Join my company</button></form>'; }
+  else if (m === 'join') { const iv = S.invite; head = iv ? 'Join ' + iv.company_name : 'Join your company'; links = link('signin', 'Already have a Subbit login? Sign in');
+    form = '<form data-form="joinsignup"><p class="mut" style="margin:0">' + (iv ? 'You have been invited as ' + esc((ROLE_LABEL[iv.role] || iv.role).toLowerCase()) + '. Create your login to get started.' : 'Your owner or manager sends you an invite link or a code from their Account screen.') + '</p>' + field('jc', 'code', 'Invite code', S.joinCode, 'required autocapitalize="characters" autocomplete="off"') + field('dn', 'display', 'Your name', '', 'required') + email + pw() + '<button class="btn"' + dis() + '>Join my company</button></form>'; }
   else if (m === 'forgot') { head = 'Reset your password'; form = '<form data-form="forgot"><p class="mut" style="margin:0">We will email you a link to set a new password.</p>' + email + '<button class="btn"' + dis() + '>Send reset link</button></form>'; }
   else if (m === 'newpw') { head = 'Choose a new password'; links = ''; form = '<form data-form="newpw"><p class="mut" style="margin:0">For ' + esc(S.session && S.session.user.email) + '.</p>' + pw(true) + '<button class="btn"' + dis() + '>Save password</button></form>'; }
-  else { form = '<form data-form="signin">' + email + pw() + '<button class="btn"' + dis() + '>Sign in</button></form>'; links = link('signup', 'Start a new company account') + link('join', 'Join your company with a code') + link('forgot', 'Forgot password?'); }
+  else { form = '<form data-form="signin">' + email + pw() + '<button class="btn"' + dis() + '>Sign in</button></form>'; links = link('signup', 'Start a new company account') + link('join', 'Join your company with an invite') + link('forgot', 'Forgot password?'); }
   return shell('<div class="brandsub">Work orders, scheduling and invoices for subcontractors.</div>', '<h1 class="sheeth">' + head + '</h1>' + form + '<div class="links">' + links + '</div>');
 }
 function viewOnboard() {                  // signed in, not in a company, and wants to join one
   const p = S.form || {};
-  return shell('<div class="brandsub">Signed in as ' + esc(S.session.user.email) + '</div>', '<h1 class="sheeth">Join your company</h1><form data-form="join">' + field('jc', 'code', 'Join code', p.code, 'required autocapitalize="characters" autocomplete="off"') + field('dn2', 'display', 'Your name', p.display, 'required') + '<button class="btn"' + dis() + '>Join</button></form>' +
+  return shell('<div class="brandsub">Signed in as ' + esc(S.session.user.email) + '</div>', '<h1 class="sheeth">' + (S.invite ? 'Join ' + esc(S.invite.company_name) : 'Join your company') + '</h1><form data-form="join">' + field('jc', 'code', 'Invite code', p.code || S.joinCode, 'required autocapitalize="characters" autocomplete="off"') + field('dn2', 'display', 'Your name', p.display, 'required') + '<button class="btn"' + dis() + '>Join</button></form>' +
     '<div class="links"><button class="link" data-act="tosetup">Start a new company instead</button><button class="link" data-act="signout">Sign out</button></div>');
 }
 // first-time setup: company name, logo, contact details, done
@@ -582,7 +591,7 @@ function viewSetup() {
   const bar = '<div class="steps" role="img" aria-label="Step ' + n + ' of 4">' + [1, 2, 3, 4].map(i => '<i class="' + (i <= n ? 'on' : '') + '"></i>').join('') + '</div><div class="brandsub">Step ' + n + ' of 4</div>';
   let body;
   if (n === 1) body = '<h1 class="sheeth">Name your company</h1><p class="mut">This is how contractors will see you on work orders and invoices.</p><form data-form="setup1">' + field('cn', 'company', 'Company name', co.name || p.company, 'required autocomplete="organization"') + field('dn', 'display', 'Your name', (S.profile && S.profile.display_name) || p.display, 'required autocomplete="name"') + '<button class="btn"' + dis() + '>Continue</button></form>' +
-    (S.profile ? '' : '<div class="links"><button class="link" data-act="tojoin">I have a join code from my company</button><button class="link" data-act="signout">Sign out</button></div>');
+    (S.profile ? '' : '<div class="links"><button class="link" data-act="tojoin">I have an invite from my company</button><button class="link" data-act="signout">Sign out</button></div>');
   else if (n === 2) body = '<h1 class="sheeth">Add your logo</h1><p class="mut">It goes at the top of your invoices and work orders. You can change it later in Account.</p>' +
     '<div class="logodrop">' + (logoUrl() ? '<img src="' + esc(logoUrl()) + '" alt="Your logo">' : '<div class="mono big" aria-hidden="true">' + esc(initials(co.name)) + '</div>') + '</div>' +
     '<label class="btn ghost filebtn">' + (S.busy ? 'Uploading…' : logoUrl() ? 'Choose a different logo' : 'Upload logo') + '<input type="file" accept="image/*" data-change="logo"' + dis() + '></label>' +
@@ -790,8 +799,15 @@ function viewAccount() {
           (S.form && S.form.removing === t.id ? '<div><button class="link" style="color:var(--bad)" data-act="removeyes" data-id="' + esc(t.id) + '">Confirm remove</button></div>' : '<div><button class="link" data-act="remove" data-id="' + esc(t.id) + '">Remove</button></div>') + '</div>'
           : pill('', ROLE_LABEL[t.role] || t.role)) + '</div>';
     }).join('') +
-      (canBill() ? '<form data-form="invite"><label for="ir">Add a team member</label><select id="ir" name="role">' + roleOptions('laborer', owner ? ['laborer', 'project_manager', 'manager'] : ['laborer', 'project_manager']) + '</select><div class="mut" style="margin-top:6px">Crew see scheduled jobs and can mark them complete with photos. They never see pay. Project managers see everything but cannot invoice. Managers can also invoice and link contractors.</div><button class="btn ghost"' + dis() + '>Create join code</button></form>' : '') + '</div>' +
-      (S.invites.length ? '<h2>Join codes waiting</h2>' + S.invites.map(i => '<div class="card"><div class="row" style="align-items:center"><div><div class="pay" style="letter-spacing:.1em;font-size:19px">' + esc(i.code) + '</div><div class="mut">' + esc(ROLE_LABEL[i.role]) + ' · expires ' + esc(fmtDate(String(i.expires_at).slice(0, 10))) + '</div></div><button class="link" data-act="cancelinvite" data-id="' + esc(i.id) + '">Cancel</button></div><div class="mut">They open this app, tap "Join your company with a code", and enter it.</div></div>').join('') : '');
+      (canBill() ? '<form data-form="invite"><label for="ir">Add a team member</label><select id="ir" name="role">' + roleOptions('laborer', owner ? ['laborer', 'project_manager', 'manager'] : ['laborer', 'project_manager']) + '</select><div class="mut" style="margin-top:6px">Crew see scheduled jobs and can mark them complete with photos. They never see pay. Project managers see everything but cannot invoice. Managers can also invoice and link contractors.</div><button class="btn ghost"' + dis() + '>Create invite link</button></form>' : '') + '</div>' +
+      (S.invites.length ? '<h2>Invites waiting</h2>' + S.invites.map(i => {
+        const url = inviteLink(i.code), text = 'Join ' + (co.name || 'our team') + ' on ' + APP_NAME + '. Tap to set up your login: ' + url;
+        return '<div class="card"><div class="row" style="align-items:center"><div><div class="title">' + esc(ROLE_LABEL[i.role]) + ' invite</div><div class="mut">Expires ' + esc(fmtDate(String(i.expires_at).slice(0, 10))) + '. Works once.</div></div><button class="link" data-act="cancelinvite" data-id="' + esc(i.id) + '" data-confirm="Yes, cancel">Cancel</button></div>' +
+          '<div class="linkbox">' + esc(url) + '</div>' +
+          '<div class="two"><button class="btn" data-act="copyinvite" data-id="' + esc(i.code) + '">Copy link</button>' + (navigator.share ? '<button class="btn ghost" data-act="shareinvite" data-id="' + esc(i.code) + '">Share</button>' : '') + '</div>' +
+          '<div class="two"><a class="btn ghost" href="sms:?&body=' + encodeURIComponent(text) + '">Text it</a><a class="btn ghost" href="mailto:?subject=' + encodeURIComponent('Join ' + (co.name || 'our team') + ' on ' + APP_NAME) + '&body=' + encodeURIComponent(text) + '">Email it</a></div>' +
+          '<div class="mut" style="margin-top:10px">Or they can open the app, tap "Join your company with an invite", and enter code <b>' + esc(i.code) + '</b>.</div></div>';
+      }).join('') : '');
   }
   return msgHtml() + (owner ? '<div class="card"><div class="row" style="align-items:center"><div class="who">' + (logoUrl() ? '<img class="acctlogo" src="' + esc(logoUrl()) + '" alt="Your logo">' : '<div class="mono" aria-hidden="true">' + esc(initials(co.name)) + '</div>') + '<div><div class="title">' + esc(co.name) + '</div><div class="mut">Logo for invoices and work orders</div></div></div>' +
       '<label class="link filebtn">' + (S.busy ? 'Uploading…' : logoUrl() ? 'Change' : 'Upload') + '<input type="file" accept="image/*" data-change="logo"' + dis() + '></label></div></div>' : '') +
@@ -877,8 +893,10 @@ async function enter() {                 // after a session exists: profile -> f
       try { await api.joinTeam(pend.code, pend.display); await api.loadProfile(); }
       catch (e) { S.form = pend; S.view = 'onboard'; flash('err', errText(e)); return; }
     }
+    if (!S.profile && S.joinCode) { S.form = { code: S.joinCode }; S.view = 'onboard'; return; }
     if (!S.profile) { S.form = {}; S.setupStep = 1; S.view = 'setup'; return; }
   }
+  if (S.joinCode) { flash('note', 'You are already part of ' + ((S.company && S.company.name) || 'a company') + ', so that invite was not used. Sign out first to join a different company.'); S.joinCode = ''; S.invite = null; }
   if (role() === 'owner' && S.company && !S.company.setup_done) { S.setupStep = 2; S.view = 'setup'; return; }   // first login
   await openApp();
 }
@@ -888,6 +906,10 @@ async function run(fn, okText) {         // one place for busy state + error dis
   try { await fn(); if (okText) flash('good', okText); }
   catch (e) { if (e.code === 'not_authenticated') { api.signOut(); S.view = 'auth'; S.authMode = 'signin'; } flash('err', errText(e)); }
   S.busy = false; render();
+}
+async function copyText(t) {
+  try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(t); return true; } } catch (_) {}
+  try { const ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return !!ok; } catch (_) { return false; }
 }
 const fields = form => Object.fromEntries([...new FormData(form)].filter(([, v]) => typeof v === 'string').map(([k, v]) => [k, v.trim()]));
 async function signUpFlow(f, pend) {
@@ -914,7 +936,7 @@ document.addEventListener('submit', ev => {
   else if (kind === 'newpw') run(async () => { await api.setPassword(f.password); await enter(); }, 'Password saved.');
   else if (kind === 'join') { S.form = Object.assign({}, S.form, { code: f.code, display: f.display }); run(async () => { await api.joinTeam(f.code, f.display); await enter(); }); }
   else if (kind === 'account') run(async () => { await api.updateAccount(f); await api.loadProfile(); await api.loadData(); }, 'Saved.');
-  else if (kind === 'invite') run(async () => { await api.createInvite(f.role); await api.loadData(); }, 'Join code created. Give it to your team member.');
+  else if (kind === 'invite') run(async () => { await api.createInvite(f.role); await api.loadData(); }, 'Invite created. Send the link to your team member.');
   else if (kind === 'contractor') run(async () => {
     const isNew = !S.edit.id, r = await api.saveContractor(S.edit.id, f); await api.loadData();
     if (isNew) { const c = S.contractors.find(x => r && r.id ? x.id === r.id : x.name === f.name); if (c) { S.edit = { kind: 'contractor', id: c.id }; S.cview = 'jobs'; } else back(); }
@@ -1017,7 +1039,9 @@ document.addEventListener('click', ev => {
   else if (a === 'canceldecline') S.form = null;
   else if (a === 'remove') S.form = { removing: id };
   else if (a === 'removeyes') return run(async () => { await api.removeMember(id); S.form = null; await api.loadData(); }, 'Removed from the team.');
-  else if (a === 'cancelinvite') return run(async () => { await api.cancelInvite(id); await api.loadData(); }, 'Join code cancelled.');
+  else if (a === 'copyinvite') { copyText(inviteLink(id)).then(ok => { flash(ok ? 'good' : 'err', ok ? 'Invite link copied. Paste it into a text or email.' : 'Could not copy. Press and hold the link to copy it.'); render(); }); return; }
+  else if (a === 'shareinvite') { navigator.share({ title: 'Join ' + ((S.company && S.company.name) || 'our team') + ' on ' + APP_NAME, text: 'Join ' + ((S.company && S.company.name) || 'our team') + ' on ' + APP_NAME + '. Tap to set up your login:', url: inviteLink(id) }).catch(() => {}); return; }
+  else if (a === 'cancelinvite') return run(async () => { await api.cancelInvite(id); await api.loadData(); }, 'Invite cancelled.');
   else if (a === 'accept') return run(async () => { await api.respond(S.detailId, true, null); await api.loadData(); }, 'Accepted. It is on your schedule.');
   else if (a === 'cancelorder') return run(async () => { await api.cancelOrder(S.detailId); await api.loadData(); }, 'Job cancelled.');
   else if (a === 'markpay') return run(async () => { await api.markPay(S.detailId, id); await api.loadData(); }, id === 'paid' ? 'Marked paid.' : 'Marked approved.');
@@ -1031,6 +1055,12 @@ document.addEventListener('click', ev => {
 (async function boot() {
   document.title = APP_NAME;
   render();
+  const qs = new URLSearchParams(location.search), jc = (qs.get('join') || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
+  if (jc) {                               // opened from an invite link
+    qs.delete('join'); history.replaceState(null, '', location.pathname + (qs.toString() ? '?' + qs.toString() : '') + location.hash);
+    S.joinCode = jc; S.authMode = 'join';
+    try { S.invite = await api.peekInvite(jc); } catch (e) { flash('err', errText(e)); S.invite = null; }
+  }
   if (!DEMO) {
     const hp = new URLSearchParams(location.hash.replace(/^#/, ''));
     if (hp.get('access_token') || hp.get('error_description')) {      // came back from an email link
