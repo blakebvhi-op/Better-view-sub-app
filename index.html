@@ -365,8 +365,8 @@ const PENDING_KEY = 'subapp_pending_v2';
 const CONTRACTOR_COLS = 'id,company_id,name,contact_name,phone,email,address,notes,request_token,self_added,link_status,link_code,link_code_expires,linked_name,linked_at';
 const DEMO = !SB_URL || !SB_KEY || /[?&]demo=1\b/.test(location.search);
 const SITE_URL = location.origin + location.pathname;
-const joinLink = tok => new URL('request.html', SITE_URL).href + '?c=' + encodeURIComponent(tok);
-const requestLink = tok => new URL('request.html', SITE_URL).href + '?t=' + encodeURIComponent(tok);
+const joinLink = tok => new URL('jobs/', SITE_URL).href + '?c=' + encodeURIComponent(tok);
+const requestLink = tok => new URL('jobs/', SITE_URL).href + '?t=' + encodeURIComponent(tok);
 const inviteLink = code => SITE_URL + '?join=' + encodeURIComponent(code);
 
 const NOW = new Date();
