@@ -185,6 +185,7 @@ table.lines tbody tr:nth-child(even){background:#f1f3f5}
 .logodrop{display:grid;place-items:center;height:150px;margin:16px 0 4px;border-radius:18px;background:var(--mist)}
 .logodrop img{max-width:70%;max-height:110px;object-fit:contain}
 .acctlogo{width:44px;height:44px;border-radius:12px;object-fit:contain;background:var(--mist);flex:none}
+.waiting{background:var(--warn-soft);box-shadow:none;color:#5c3b05}.waiting .mut{color:#7a5310}.waiting svg{flex:none}
 .linkbox{margin-top:12px;padding:11px 12px;border-radius:12px;background:var(--mist);font-size:14px;word-break:break-all;-webkit-user-select:all;user-select:all}
 a.btn{text-decoration:none}
 .bigcheck{width:68px;height:68px;border-radius:50%;background:var(--ok-soft);color:var(--ok);font-size:36px;line-height:68px;margin:14px auto 12px}
@@ -361,13 +362,15 @@ const BILLING_ROLES = ['owner', 'manager'];
 const ROLE_LABEL = { owner: 'Owner', manager: 'Manager', project_manager: 'Project manager', laborer: 'Crew' };
 const SESSION_KEY = 'subapp_session_v1';
 const PENDING_KEY = 'subapp_pending_v2';
-const CONTRACTOR_COLS = 'id,company_id,name,contact_name,phone,email,address,notes,link_status,link_code,link_code_expires,linked_name,linked_at';
+const CONTRACTOR_COLS = 'id,company_id,name,contact_name,phone,email,address,notes,request_token,self_added,link_status,link_code,link_code_expires,linked_name,linked_at';
 const DEMO = !SB_URL || !SB_KEY || /[?&]demo=1\b/.test(location.search);
 const SITE_URL = location.origin + location.pathname;
+const joinLink = tok => new URL('request.html', SITE_URL).href + '?c=' + encodeURIComponent(tok);
+const requestLink = tok => new URL('request.html', SITE_URL).href + '?t=' + encodeURIComponent(tok);
 const inviteLink = code => SITE_URL + '?join=' + encodeURIComponent(code);
 
 const NOW = new Date();
-const S = { view: 'loading', joinCode: '', invite: null, setupStep: 1, authMode: 'signin', tab: 'contractors', stack: [], draft: null, cview: 'jobs', saved: [],
+const S = { view: 'loading', contractorInvite: null, joinCode: '', invite: null, setupStep: 1, authMode: 'signin', tab: 'contractors', stack: [], draft: null, cview: 'jobs', saved: [],
   filter: 'open', search: '', detailId: null, edit: null,
   cal: { y: NOW.getFullYear(), m: NOW.getMonth() }, calDay: null, calMode: 'month', weekStart: null,
   session: null, profile: null, company: null, orders: [], pays: [], contractors: [], team: [], invites: [],
@@ -448,6 +451,8 @@ const ERR = {
   amount_required: 'The invoice total must be more than zero. Add a rate and quantity to at least one line.',
   work_order_not_complete: 'Mark the work order complete before billing.',
   already_submitted: 'An invoice was already sent for this work order.',
+  requester_required: 'Enter a name.',
+  contractor_has_jobs: 'This contractor has jobs, so the card cannot be deleted.',
   not_found_or_linked: 'Payment status on a linked work order is set by the contractor.',
   '42501': 'Permission denied. Sign out and back in, then try again.',
   PGRST202: 'The database is not set up yet. Run the latest setup SQL, then try again.',
@@ -516,7 +521,7 @@ const live = {
   async loadProfile() {
     const rows = await sb.req('/rest/v1/profiles?select=*&id=eq.' + encodeURIComponent(S.session.user.id));
     S.profile = rows && rows[0] || null; S.company = null;
-    if (S.profile) { const c = await sb.req('/rest/v1/companies?select=*&id=eq.' + encodeURIComponent(S.profile.company_id)); S.company = c && c[0] || null; }
+    if (S.profile) { const c = await sb.req('/rest/v1/companies?select=id,name,phone,email,address,logo_path,setup_done&id=eq.' + encodeURIComponent(S.profile.company_id)); S.company = c && c[0] || null; }
   },
   async loadData() {                    // RLS scopes every row to this company
     const team = sb.req('/rest/v1/profiles?select=id,role,display_name,email&order=display_name');
@@ -556,6 +561,9 @@ const live = {
   saveItem: (id, f) => sb.rpc('saved_item_save', { p_id: id || null, p_contractor_id: f.contractor_id || null, p_title: f.title, p_detail: f.detail, p_unit: f.unit, p_rate: f.rateCents / 100 }),
   deleteItem: id => sb.rpc('saved_item_delete', { p_id: id }),
   saveContractor: (id, f) => sb.rpc('contractor_save', { p_id: id || null, p_name: f.name, p_contact_name: f.contact_name, p_phone: f.phone, p_email: f.email, p_address: f.address, p_notes: f.notes }),
+  async contractorInvite(action) { const r = await sb.rpc('company_contractor_link', { p_action: action }); return r.token || null; },
+  deleteContractor: id => sb.rpc('contractor_delete', { p_id: id }),
+  requestLinkSet: (id, action) => sb.rpc('contractor_request_link', { p_id: id, p_action: action }),
   createLinkCode: id => sb.rpc('contractor_create_link_code', { p_id: id }),
   revokeLink: id => sb.rpc('contractor_revoke_link', { p_id: id }),
   saveOrder: (id, f) => sb.rpc('wo_save_manual', { p_id: id || null, p_contractor_id: f.contractor_id || null, p_title: f.title, p_address: f.address, p_scope: f.scope, p_line_items: f.line_items, p_pay_amount: f.payCents / 100, p_scheduled_date: f.scheduled_date || null }),
@@ -602,8 +610,10 @@ const demoDb = {
     { id: 'wo-1', contractor_id: 'c-1', source: 'link', title: 'Tear-off and re-roof, 24 sq', address: '123 Sample St, Anytown, WI', scope: 'Full tear-off to deck. Install ice and water at eaves and valleys, synthetic underlayment, architectural shingles, new pipe boots and ridge vent. Haul away debris.', line_items: [{ desc: 'Tear off', detail: '1 layer asphalt', qty: 24, unit: 'sq' }, { desc: 'Architectural shingles', detail: '', qty: 24, unit: 'sq' }, { desc: 'Flashing', detail: 'Chimney\nTwo skylights', qty: 3, unit: 'ea' }, { desc: 'Ridge vent', detail: '', qty: 42, unit: 'lf' }], photos: [{ url: swatch('Front elevation', '#64748b'), caption: 'Front' }, { url: swatch('Rear slope', '#475569'), caption: 'Rear' }], pay_amount: 6480, scheduled_date: day(3), status: 'sent' },
     { id: 'wo-2', contractor_id: 'c-2', source: 'manual', title: 'Gutter install, 5" K-style', address: '456 Example Ave, Anytown, WI', scope: 'Remove existing gutters. Install 5" seamless aluminum with 2x3 downspouts, 4 drops.', line_items: [{ desc: 'Gutters and downspouts', detail: "148' gutters\n40' downs", qty: 188, unit: 'lf' }, { desc: 'Material pick up', detail: '', qty: 1, unit: 'ea' }], photos: [], pay_amount: 1485, scheduled_date: day(6), status: 'accepted' },
     { id: 'wo-3', contractor_id: 'c-1', source: 'link', title: 'Siding repair, north wall', address: '789 Placeholder Rd, Anytown, WI', scope: 'Replace 2 sq of damaged vinyl siding, match existing profile. Re-flash window head.', line_items: [{ desc: 'Vinyl siding D4', qty: 2, unit: 'sq' }], photos: [], pay_amount: 950, scheduled_date: day(-4), status: 'complete', completion_photos: [{ url: swatch('Completed', '#15803d'), caption: '' }], completion_notes: 'Done. Color match is close.' },
-    { id: 'wo-4', contractor_id: 'c-2', source: 'manual', title: 'Soffit and fascia wrap', address: '12 Test Ct, Anytown, WI', scope: 'Wrap fascia in aluminum coil, install vented soffit on front elevation.', line_items: [{ desc: 'Vented soffit', qty: 60, unit: 'lf' }], photos: [], pay_amount: 1375.5, scheduled_date: day(-12), status: 'complete', completion_photos: [{ url: swatch('Completed', '#15803d'), caption: '' }] }
+    { id: 'wo-4', contractor_id: 'c-2', source: 'manual', title: 'Soffit and fascia wrap', address: '12 Test Ct, Anytown, WI', scope: 'Wrap fascia in aluminum coil, install vented soffit on front elevation.', line_items: [{ desc: 'Vented soffit', qty: 60, unit: 'lf' }], photos: [], pay_amount: 1375.5, scheduled_date: day(-12), status: 'complete', completion_photos: [{ url: swatch('Completed', '#15803d'), caption: '' }] },
+    { id: 'wo-5', contractor_id: 'c-2', source: 'request', requested_by: 'Pat Example, 555-0101', title: 'Storm repair, rear slope', address: '77 Sample Way, Anytown, WI', scope: 'Homeowner is home after 3. Shingles are on site.', line_items: [{ desc: 'Replace shingles', detail: 'Rear slope near chimney', qty: 4, unit: 'sq' }], photos: [], pay_amount: 900, scheduled_date: day(9), status: 'sent' }
   ],
+  // (wo-5 below arrived through a job request link)
   pays: [{ id: 'pr-1', work_order_id: 'wo-4', amount: 1375.5, notes: '', status: 'submitted', invoice_number: 'INV-1001', invoice_date: day(-10), due_terms: 'On receipt', po: '12 Test Ct, Anytown, WI', line_items: [{ desc: 'Vented soffit', detail: 'Front elevation', qty: '60', unit: 'lf', rate: '3.00' }, { desc: 'Fascia wrap', detail: '', qty: '239', unit: 'lf', rate: '5.00' }, { desc: 'Material pick up', detail: '', qty: '1', unit: 'ea', rate: '0.50' }] }],
   saved: [
     { id: 's-1', contractor_id: 'c-2', title: 'Gutters and downspouts', detail: '', unit: 'lf', rate: 7.5 },
@@ -642,14 +652,17 @@ const demo = {
   async saveItem(id, f) { await wait(); if (!f.title) throw appErr('title_required'); const row = { contractor_id: f.contractor_id || null, title: f.title, detail: f.detail, unit: f.unit, rate: f.rateCents / 100 }; const cur = demoDb.saved.find(x => x.id === id); if (cur) Object.assign(cur, row); else demoDb.saved.push(Object.assign({ id: uuid() }, row)); },
   async deleteItem(id) { await wait(); demoDb.saved = demoDb.saved.filter(x => x.id !== id); },
   async saveContractor(id, f) { await wait(); if (!f.name) throw appErr('name_required'); const c = demoDb.contractors.find(x => x.id === id); if (c) Object.assign(c, f); else demoDb.contractors.push(Object.assign({ id: uuid(), link_status: 'manual' }, f)); },
+  async contractorInvite(action) { await wait(); if (action === 'off') demoDb.cinvite = null; else if (action !== 'peek' && (action === 'new' || !demoDb.cinvite)) demoDb.cinvite = uuid().replace(/-/g, ''); return demoDb.cinvite || null; },
+  async deleteContractor(id) { await wait(); if (demoDb.orders.some(o => o.contractor_id === id)) throw appErr('contractor_has_jobs'); demoDb.contractors = demoDb.contractors.filter(c => c.id !== id); },
+  async requestLinkSet(id, action) { await wait(); const c = demoDb.contractors.find(x => x.id === id); if (!c) throw appErr('not_found'); c.request_token = action === 'off' ? null : (action === 'new' || !c.request_token ? uuid().replace(/-/g, '') : c.request_token); },
   async createLinkCode(id) { await wait(); const c = demoDb.contractors.find(x => x.id === id); if (!c) throw appErr('not_found'); if (c.link_status === 'active') throw appErr('already_linked'); c.link_status = 'pending'; c.link_code = uuid().replace(/-/g, '').slice(0, 10).toUpperCase(); c.link_code_expires = day(7); },
   async revokeLink(id) { await wait(); const c = demoDb.contractors.find(x => x.id === id); if (!c || !['pending', 'active'].includes(c.link_status)) throw appErr('not_found'); c.link_status = 'revoked'; c.link_code = null; },
-  async saveOrder(id, f) { await wait(); if (!f.title) throw appErr('title_required'); const row = { contractor_id: f.contractor_id || null, title: f.title, address: f.address, scope: f.scope, line_items: f.line_items, pay_amount: f.payCents / 100, scheduled_date: f.scheduled_date || null }; if (id) { const o = dOrder(id); if (!o || o.source !== 'manual' || o.status !== 'accepted') throw appErr('not_found_or_locked'); Object.assign(o, row); return { id }; } const nid = uuid(); demoDb.orders.push(Object.assign({ id: nid, source: 'manual', status: 'accepted', photos: [] }, row)); return { id: nid }; },
-  async cancelOrder(id) { await wait(); const o = dOrder(id); if (!o || o.source !== 'manual' || o.status !== 'accepted') throw appErr('not_found_or_locked'); o.status = 'cancelled'; },
+  async saveOrder(id, f) { await wait(); if (!f.title) throw appErr('title_required'); const row = { contractor_id: f.contractor_id || null, title: f.title, address: f.address, scope: f.scope, line_items: f.line_items, pay_amount: f.payCents / 100, scheduled_date: f.scheduled_date || null }; if (id) { const o = dOrder(id); if (!o || o.source === 'link' || o.status !== 'accepted') throw appErr('not_found_or_locked'); Object.assign(o, row); return { id }; } const nid = uuid(); demoDb.orders.push(Object.assign({ id: nid, source: 'manual', status: 'accepted', photos: [] }, row)); return { id: nid }; },
+  async cancelOrder(id) { await wait(); const o = dOrder(id); if (!o || o.source === 'link' || o.status !== 'accepted') throw appErr('not_found_or_locked'); o.status = 'cancelled'; },
   async respond(id, accept, reason) { await wait(); const o = dOrder(id); if (!o || o.status !== 'sent') throw appErr('not_found_or_already_answered'); o.status = accept ? 'accepted' : 'declined'; if (!accept) o.decline_reason = reason; },
   async complete(id, files, notes) { await wait(); if (!files.length) throw appErr('photo_required'); const o = dOrder(id); if (!o || o.status !== 'accepted') throw appErr('not_found_or_not_accepted'); o.status = 'complete'; o.completion_photos = files.map(f => ({ url: URL.createObjectURL(f), caption: '' })); o.completion_notes = notes; },
-  async submitInvoice(id, d) { await wait(); const lines = cleanLines(d.lines, true), total = linesTotal(lines); if (!(total > 0)) throw appErr('amount_required'); const o = dOrder(id); if (!o || o.status !== 'complete') throw appErr('work_order_not_complete'); const cur = demoDb.pays.find(p => p.work_order_id === id); if (cur && !(cur.status === 'rejected' || (cur.status === 'submitted' && o.source === 'manual'))) throw appErr('already_submitted'); const row = { amount: total / 100, notes: d.notes, status: 'submitted', invoice_number: d.number, invoice_date: d.date || day(0), due_terms: d.due, po: d.po, line_items: lines }; if (cur) Object.assign(cur, row); else demoDb.pays.push(Object.assign({ id: uuid(), work_order_id: id }, row)); },
-  async markPay(id, status) { await wait(); const o = dOrder(id), p = demoDb.pays.find(x => x.work_order_id === id); if (!o || !p || o.source !== 'manual' || !['submitted', 'approved'].includes(p.status)) throw appErr('not_found_or_linked'); p.status = status; },
+  async submitInvoice(id, d) { await wait(); const lines = cleanLines(d.lines, true), total = linesTotal(lines); if (!(total > 0)) throw appErr('amount_required'); const o = dOrder(id); if (!o || o.status !== 'complete') throw appErr('work_order_not_complete'); const cur = demoDb.pays.find(p => p.work_order_id === id); if (cur && !(cur.status === 'rejected' || (cur.status === 'submitted' && o.source !== 'link'))) throw appErr('already_submitted'); const row = { amount: total / 100, notes: d.notes, status: 'submitted', invoice_number: d.number, invoice_date: d.date || day(0), due_terms: d.due, po: d.po, line_items: lines }; if (cur) Object.assign(cur, row); else demoDb.pays.push(Object.assign({ id: uuid(), work_order_id: id }, row)); },
+  async markPay(id, status) { await wait(); const o = dOrder(id), p = demoDb.pays.find(x => x.work_order_id === id); if (!o || !p || o.source === 'link' || !['submitted', 'approved'].includes(p.status)) throw appErr('not_found_or_linked'); p.status = status; },
   signOut() { S.session = null; }
 };
 const api = DEMO ? demo : live;
@@ -789,7 +802,7 @@ function contractorCard(c) {
   const mine = S.orders.filter(o => o.contractor_id === c.id), open = mine.filter(o => o.status === 'sent' || o.status === 'accepted').length;
   const owed = mine.reduce((t, o) => { const p = payFor(o.id); return t + (p && (p.status === 'submitted' || p.status === 'approved') ? cents(p.amount) : 0); }, 0);
   return '<button class="card ccard" data-act="opencontractor" data-id="' + esc(c.id) + '"><div class="row"><div class="who"><div class="mono" aria-hidden="true">' + esc(initials(c.name)) + '</div><div><div class="title">' + esc(c.name) + '</div><div class="mut">' + esc(c.contact_name || '') + '</div></div></div>' +
-    (c.link_status === 'active' ? pill('s-complete', 'Linked') : c.link_status === 'pending' ? pill('s-sent', 'Code waiting') : '') + '</div>' +
+    (mine.some(o => o.status === 'sent') ? pill('s-sent', 'Needs answer') : c.self_added && !mine.length ? pill('s-accepted', 'Added themselves') : c.link_status === 'active' ? pill('s-complete', 'Linked') : c.link_status === 'pending' ? pill('s-sent', 'Code waiting') : '') + '</div>' +
     '<div class="cstats"><div><b>' + open + '</b><span>open job' + (open === 1 ? '' : 's') + '</span></div><div><b>' + mine.length + '</b><span>total</span></div><div><b>' + money(owed) + '</b><span>owed to you</span></div></div></button>';
 }
 
@@ -805,10 +818,11 @@ function docHead(kind, metaRows) {
     '<div class="docmeta"><b>' + kind + '</b>' + metaRows.filter(r => r[1]).map(r => '<span>' + r[0] + '</span><div>' + r[1] + '</div>').join('') + '</div></div>';
 }
 function workOrderDoc(o) {
-  const items = Array.isArray(o.line_items) ? o.line_items : [], manual = o.source === 'manual';
+  const items = Array.isArray(o.line_items) ? o.line_items : [], manual = o.source !== 'link';
   const addr = o.address ? '<a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(o.address) + '" target="_blank" rel="noopener">' + esc(o.address) + '</a>' : '';
   return '<div class="doc">' + docHead('WORK ORDER', [['Date', esc(fmtDate(o.scheduled_date))], ['Job address', addr], ['Status', esc(ORDER_LABEL[o.status] || o.status)]]) +
-    (gcName(o) ? '<div class="lbl">' + (manual ? 'For' : 'From') + '</div><div class="doctitle" style="font-size:17px;margin-bottom:10px">' + esc(gcName(o)) + '</div>' : '') +
+    (gcName(o) ? '<div class="lbl">' + (o.source === 'manual' ? 'For' : 'From') + '</div><div class="doctitle" style="font-size:17px;margin-bottom:10px">' + esc(gcName(o)) + '</div>' : '') +
+    (o.requested_by ? '<div class="mut" style="margin:-6px 0 10px">Requested by ' + esc(o.requested_by) + '</div>' : '') +
     '<div class="title" style="margin:6px 0 8px">' + esc(o.title || 'Work order') + '</div>' + linesTable(items, false) +
     (o.scope ? '<div class="lbl" style="margin-top:14px">Scope and notes</div><div class="pre">' + esc(o.scope) + '</div>' : '') +
     (o.status === 'declined' && o.decline_reason ? '<div class="lbl" style="margin-top:14px">Declined</div><div class="pre">' + esc(o.decline_reason) + '</div>' : '') + '</div>';
@@ -914,8 +928,23 @@ function viewExport() {
     '<button class="btn"' + (n ? '' : ' disabled') + '>Download file</button></form>' +
     '<div class="card"><div class="title">How to bring it in</div><p class="mut" style="margin:6px 0 0">' + esc(how) + '</p></div>';
 }
+function viewContractorInvite() {
+  const tok = S.contractorInvite, co = (S.company && S.company.name) || 'us';
+  if (!tok) return msgHtml() + '<div class="card"><div class="title">Let contractors add themselves</div><p class="mut" style="margin:4px 0 0">Create one link and send it to any contractor you work for. They fill in their company and contact details, and their card appears in your account, ready to send you jobs. No login on their side.</p><button class="btn" data-act="cinvite" data-id="get"' + dis() + '>Create invite link</button></div>';
+  const url = joinLink(tok), text = 'Set up your profile to send jobs to ' + co + ': ' + url;
+  return msgHtml() + '<div class="card"><div class="title">Contractor invite link</div><p class="mut" style="margin:4px 0 0">Send this to any contractor. When they fill in their profile, their card is created in your account and they can send you jobs. The same link works for every contractor.</p>' +
+    '<div class="linkbox">' + esc(url) + '</div>' +
+    '<div class="two"><button class="btn" data-act="copycinvite">Copy link</button>' + (navigator.share ? '<button class="btn ghost" data-act="sharecinvite">Share</button>' : '') + '</div>' +
+    '<div class="two"><a class="btn ghost" href="sms:?&body=' + encodeURIComponent(text) + '">Text it</a><a class="btn ghost" href="mailto:?subject=' + encodeURIComponent('Send jobs to ' + co) + '&body=' + encodeURIComponent(text) + '">Email it</a></div>' +
+    '<div class="row" style="margin-top:8px"><button class="link" data-act="cinvite" data-id="new" data-confirm="Yes, replace the link">Make a new link</button><button class="link" data-act="cinvite" data-id="off" data-confirm="Yes, turn it off">Turn off</button></div>' +
+    '<p class="mut" style="margin:10px 0 0">Contractors who already added themselves keep working if you replace or turn off this link.</p></div>';
+}
+function waitingBanner() {
+  const n = S.orders.filter(o => o.status === 'sent').length;
+  return n ? '<button class="card waiting" data-act="showwaiting"><div class="row" style="align-items:center"><div><div class="title">' + n + ' job' + (n === 1 ? '' : 's') + ' waiting for your answer</div><div class="mut">Accept or decline to put ' + (n === 1 ? 'it' : 'them') + ' on the schedule.</div></div>' + ICON.chev + '</div></button>' : '';
+}
 function viewContractors() {
-  return msgHtml() + '<button class="btn ghost" style="margin:0 0 12px" data-act="newcontractor">+ Add contractor</button>' +
+  return msgHtml() + waitingBanner() + '<div class="two" style="margin-bottom:12px"><button class="btn ghost" style="margin-top:0" data-act="newcontractor">+ Add contractor</button><button class="btn ghost" style="margin-top:0" data-act="opencinvite">Invite a contractor</button></div>' +
     (S.contractors.length ? S.contractors.map(contractorCard).join('') : '<div class="empty">Add the contractors you work for.<br>Each one gets a profile that holds their jobs, invoices and price list.</div>');
 }
 function contractorDetailsForm(c) {
@@ -938,8 +967,19 @@ function viewContractor() {
     if (c.link_status === 'active') link = '<div class="card"><div class="title">Linked' + (c.linked_name ? ' to ' + esc(c.linked_name) : '') + '</div><p class="mut">This contractor can send work orders straight into your account and sees your responses, completion photos and invoices.</p><button class="btn bad" data-act="unlink" data-confirm="Yes, unlink"' + dis() + '>Unlink</button></div>';
     else if (c.link_status === 'pending' && c.link_code) link = '<div class="card"><div class="title">Link code</div><div class="pay" style="letter-spacing:.12em;margin:6px 0">' + esc(c.link_code) + '</div><p class="mut">Give this code to your contractor. They enter it in their system (for example Better View Pro). It works once and expires ' + esc(fmtDate(String(c.link_code_expires || '').slice(0, 10))) + '.</p><div class="two"><button class="btn bad" data-act="unlink" data-confirm="Yes, cancel code"' + dis() + '>Cancel code</button><button class="btn ghost" data-act="reload"' + dis() + '>Check status</button></div></div>';
     else link = '<div class="card"><div class="title">Link this contractor</div><p class="mut">If this contractor uses Better View Pro, linking lets them send work orders straight to you. You create a code and give it to them.</p>' + (canBill() ? '<button class="btn" data-act="linkcode"' + dis() + '>Create link code</button>' : '<div class="mut">Only the owner or a manager can link.</div>') + '</div>';
-    body = contractorDetailsForm(c) + link;
-  } else body = '<button class="btn ghost" style="margin:0 0 12px" data-act="neworder" data-cid="' + esc(c.id) + '">+ New work order</button>' + (mine.length ? mine.map(orderCard).join('') : '<div class="empty">No jobs for this contractor yet.</div>');
+    body = contractorDetailsForm(c) + link + (mine.length ? '' : '<button class="btn bad" data-act="delcontractor" data-confirm="Yes, delete this card"' + dis() + '>Delete contractor</button>');
+  } else {
+    let rq;
+    if (c.request_token) {
+      const url = requestLink(c.request_token), text = 'Send jobs to ' + ((S.company && S.company.name) || 'us') + ' here: ' + url;
+      rq = '<div class="card"><div class="title">Job request link</div><p class="mut" style="margin:4px 0 0">Send this to ' + esc(c.name) + '. They can submit jobs to you without a login and add it to their home screen. Each job waits for you to accept or decline.</p>' +
+        '<div class="linkbox">' + esc(url) + '</div>' +
+        '<div class="two"><button class="btn" data-act="copyrequest">Copy link</button>' + (navigator.share ? '<button class="btn ghost" data-act="sharerequest">Share</button>' : '') + '</div>' +
+        '<div class="two"><a class="btn ghost" href="sms:?&body=' + encodeURIComponent(text) + '">Text it</a><a class="btn ghost" href="mailto:' + encodeURIComponent(c.email || '') + '?subject=' + encodeURIComponent('Send jobs to ' + ((S.company && S.company.name) || 'us')) + '&body=' + encodeURIComponent(text) + '">Email it</a></div>' +
+        '<div class="row" style="margin-top:8px"><button class="link" data-act="requestlink" data-id="new" data-confirm="Yes, replace the link">Make a new link</button><button class="link" data-act="requestlink" data-id="off" data-confirm="Yes, turn it off">Turn off</button></div></div>';
+    } else rq = '<div class="card"><div class="title">Let ' + esc(c.name) + ' send you jobs</div><p class="mut" style="margin:4px 0 0">Create a link they can use to submit jobs to your schedule. No login needed on their side, and you accept or decline each one.</p><button class="btn ghost" data-act="requestlink" data-id="get"' + dis() + '>Create job request link</button></div>';
+    body = '<button class="btn ghost" style="margin:0 0 12px" data-act="neworder" data-cid="' + esc(c.id) + '">+ New work order</button>' + (mine.length ? mine.map(orderCard).join('') : '<div class="empty" style="padding:22px 16px">No jobs for this contractor yet.</div>') + '<h2>Job requests</h2>' + rq;
+  }
   return msgHtml() + '<div class="card"><div class="row"><div class="who"><div class="mono" aria-hidden="true">' + esc(initials(c.name)) + '</div><div><div class="title" style="font-size:20px">' + esc(c.name) + '</div><div class="mut">' + esc(c.contact_name || '') + '</div>' +
     (c.phone ? '<div><a href="tel:' + esc(String(c.phone).replace(/[^\d+]/g, '')) + '">' + esc(c.phone) + '</a></div>' : '') + (c.email ? '<div><a href="mailto:' + esc(c.email) + '">' + esc(c.email) + '</a></div>' : '') + '</div></div>' +
     (c.link_status === 'active' ? pill('s-complete', 'Linked') : '') + '</div></div>' +
@@ -955,7 +995,7 @@ function viewSavedForm() {
     '<button class="btn"' + dis() + '>Save item</button></form>' + (S.edit.id ? '<button class="btn bad" data-act="delsaved" data-confirm="Yes, delete"' + dis() + '>Delete item</button>' : '');
 }
 function viewInvoiceEdit(o) {
-  const c = contractor(o.contractor_id) || {}, manual = o.source === 'manual';
+  const c = contractor(o.contractor_id) || {}, manual = o.source !== 'link';
   return msgHtml() + '<form data-form="invoice" class="card"><div class="title">Invoice for ' + esc(c.name || gcName(o) || 'this job') + '</div><div class="mut">' + esc(o.title) + '</div>' +
     '<div class="two"><div style="flex:1">' + dfield('in', 'number', 'Invoice number') + '</div><div style="flex:1">' + dfield('idt', 'date', 'Date', 'type="date"') + '</div></div>' +
     '<div class="two"><div style="flex:1">' + dfield('idu', 'due', 'Due') + '</div><div style="flex:1">' + dfield('ipo', 'po', 'PO # or job address') + '</div></div>' +
@@ -966,7 +1006,7 @@ function viewInvoiceEdit(o) {
     '<button class="btn"' + dis() + '>' + (manual ? 'Save invoice' : 'Send invoice to contractor') + '</button></form>';
 }
 function viewInvoice(o) {
-  const pr = payFor(o.id), manual = o.source === 'manual';
+  const pr = payFor(o.id), manual = o.source !== 'link';
   if (!pr) return msgHtml() + '<div class="empty">No invoice for this work order yet.</div>';
   const editable = canBill() && (pr.status === 'rejected' || (pr.status === 'submitted' && manual));
   return msgHtml() + '<div class="card noprint"><div class="row" style="align-items:center"><div>' + pill('s-' + pr.status, PAY_LABEL[pr.status] || pr.status) + (!manual && pr.status !== 'paid' && pr.status !== 'rejected' ? '<div class="mut" style="margin-top:4px">The contractor updates this status.</div>' : '') + (pr.status === 'rejected' ? '<div class="mut" style="margin-top:4px">The contractor rejected this invoice. Fix it and resend.</div>' : '') + '</div>' +
@@ -1009,10 +1049,10 @@ function photoGrid(arr) {
   return '<div class="photos">' + arr.map(p => '<a href="' + esc(photoUrl(p)) + '" target="_blank" rel="noopener"><img loading="lazy" src="' + esc(photoUrl(p)) + '" alt="' + esc(p.caption || 'Job photo') + '"></a>').join('') + '</div>';
 }
 function viewDetail(o) {
-  const pr = payFor(o.id), mg = isMgmt(), manual = o.source === 'manual', ph = Array.isArray(o.photos) ? o.photos : [], cph = Array.isArray(o.completion_photos) ? o.completion_photos : [];
+  const pr = payFor(o.id), mg = isMgmt(), manual = o.source !== 'link', ph = Array.isArray(o.photos) ? o.photos : [], cph = Array.isArray(o.completion_photos) ? o.completion_photos : [];
   let act = '';
   if (o.status === 'sent') {
-    act = '<div class="card noprint"><div class="title">Respond to this date</div><div class="mut">' + esc(fmtDate(o.scheduled_date)) + '</div>' +
+    act = '<div class="card noprint"><div class="title">' + (o.source === 'request' ? 'New job request' : 'Respond to this date') + '</div><div class="mut">' + esc(fmtDate(o.scheduled_date)) + (o.source === 'request' ? '. After you accept, you can edit the job and the pay.' : '') + '</div>' +
       (S.form && S.form.declining ? '<form data-form="decline"><label for="rs">Reason (optional)</label><textarea id="rs" name="reason"></textarea><div class="two"><button type="button" class="btn ghost" data-act="canceldecline">Back</button><button class="btn bad"' + dis() + '>Confirm decline</button></div></form>'
         : '<div class="two"><button class="btn bad" data-act="decline"' + dis() + '>Decline</button><button class="btn ok" data-act="accept"' + dis() + '>Accept</button></div>') + '</div>';
   } else if (o.status === 'accepted') {
@@ -1024,7 +1064,7 @@ function viewDetail(o) {
     else if (canBill()) act = '<div class="card noprint"><div class="title">Ready to invoice</div><p class="mut" style="margin:4px 0 0">The invoice starts from this work order’s line items and your saved rates.</p><button class="btn" data-act="editinvoice">Create invoice</button></div>';
     else act = '<div class="msg note noprint">Only the owner or a manager can invoice.</div>';
   }
-  return msgHtml() + (mg ? '<div class="card noprint"><div class="row" style="align-items:center"><div><span class="mut">Your pay</span><div class="pay">' + money(cents(o.pay_amount)) + '</div></div><button class="link" data-act="print">Print work order</button></div><div class="mut">Pay is not printed and crew never see it.</div></div>' : '') +
+  return msgHtml() + (mg ? '<div class="card noprint"><div class="row" style="align-items:center"><div><span class="mut">' + (o.source === 'request' && o.status === 'sent' ? 'Pay they offered' : 'Your pay') + '</span><div class="pay">' + (o.source === 'request' && !cents(o.pay_amount) ? 'Not set' : money(cents(o.pay_amount))) + '</div></div><button class="link" data-act="print">Print work order</button></div><div class="mut">Pay is not printed and crew never see it.</div></div>' : '') +
     act + workOrderDoc(o) +
     (ph.length ? '<h2 class="noprint">Job photos</h2><div class="card noprint">' + photoGrid(ph) + '</div>' : '') +
     (cph.length || o.completion_notes ? '<h2 class="noprint">Completion</h2><div class="card noprint">' + (cph.length ? photoGrid(cph) : '') + (o.completion_notes ? '<p class="pre" style="margin:10px 0 0">' + esc(o.completion_notes) + '</p>' : '') + '</div>' : '');
@@ -1041,6 +1081,7 @@ function render() {
     let title, body;
     if (e && e.kind === 'order') { title = e.id ? 'Edit work order' : 'New work order'; body = viewOrderForm(); }
     else if (e && e.kind === 'contractor') { title = e.id ? 'Contractor' : 'Add contractor'; body = viewContractor(); }
+    else if (e && e.kind === 'cinvite') { title = 'Invite a contractor'; body = viewContractorInvite(); }
     else if (e && e.kind === 'export') { title = 'Export invoices'; body = viewExport(); }
     else if (e && e.kind === 'saved') { title = e.id ? 'Saved item' : 'New saved item'; body = viewSavedForm(); }
     else if (e && e.kind === 'invoice' && o) { title = e.mode === 'edit' ? 'Invoice' : 'Invoice ' + ((payFor(o.id) || {}).invoice_number || ''); body = e.mode === 'edit' ? viewInvoiceEdit(o) : viewInvoice(o); }
@@ -1207,6 +1248,7 @@ document.addEventListener('click', ev => {
   else if (a === 'filter') S.filter = id;
   else if (a === 'cview') { S.cview = id; S.msg = null; }
   else if (a === 'open') go(null, id);
+  else if (a === 'showwaiting') { S.tab = 'orders'; S.filter = 'open'; S.search = ''; S.stack = []; S.edit = null; S.detailId = null; }
   else if (a === 'openexport') { go({ kind: 'export' }); S.draft = exportOptions(); }
   else if (a === 'openinvoice') go({ kind: 'invoice', mode: 'view' }, id);
   else if (a === 'editinvoice') { if (cur) { go({ kind: 'invoice', mode: 'edit' }, cur.id, S.edit && S.edit.kind === 'invoice'); S.draft = invoiceDraft(cur); } }
@@ -1235,6 +1277,18 @@ document.addEventListener('click', ev => {
   else if (a === 'canceldecline') S.form = null;
   else if (a === 'remove') S.form = { removing: id };
   else if (a === 'removeyes') return run(async () => { await api.removeMember(id); S.form = null; await api.loadData(); }, 'Removed from the team.');
+  else if (a === 'opencinvite') { go({ kind: 'cinvite' }); return run(async () => { S.contractorInvite = await api.contractorInvite('peek'); }); }
+  else if (a === 'cinvite') return run(async () => { S.contractorInvite = await api.contractorInvite(id); }, id === 'off' ? 'Link turned off.' : id === 'new' ? 'New link made. The old one no longer works.' : 'Link created. Send it to your contractors.');
+  else if (a === 'copycinvite') { copyText(joinLink(S.contractorInvite)).then(ok => { flash(ok ? 'good' : 'err', ok ? 'Link copied. Paste it into a text or email.' : 'Could not copy. Press and hold the link to copy it.'); render(); }); return; }
+  else if (a === 'sharecinvite') { navigator.share({ title: 'Send jobs to ' + ((S.company && S.company.name) || 'us'), url: joinLink(S.contractorInvite) }).catch(() => {}); return; }
+  else if (a === 'delcontractor') return run(async () => { await api.deleteContractor(S.edit.id); await api.loadData(); back(); }, 'Contractor deleted.');
+  else if (a === 'requestlink') return run(async () => { await api.requestLinkSet(S.edit.id, id); await api.loadData(); }, id === 'off' ? 'Link turned off. The old link no longer works.' : id === 'new' ? 'New link made. The old one no longer works.' : 'Link created. Send it to your contractor.');
+  else if (a === 'copyrequest' || a === 'sharerequest') {
+    const c = contractor(S.edit.id), url = c && c.request_token ? requestLink(c.request_token) : '';
+    if (a === 'copyrequest') copyText(url).then(ok => { flash(ok ? 'good' : 'err', ok ? 'Link copied. Paste it into a text or email.' : 'Could not copy. Press and hold the link to copy it.'); render(); });
+    else navigator.share({ title: 'Send jobs to ' + ((S.company && S.company.name) || 'us'), url }).catch(() => {});
+    return;
+  }
   else if (a === 'copyinvite') { copyText(inviteLink(id)).then(ok => { flash(ok ? 'good' : 'err', ok ? 'Invite link copied. Paste it into a text or email.' : 'Could not copy. Press and hold the link to copy it.'); render(); }); return; }
   else if (a === 'shareinvite') { navigator.share({ title: 'Join ' + ((S.company && S.company.name) || 'our team') + ' on ' + APP_NAME, text: 'Join ' + ((S.company && S.company.name) || 'our team') + ' on ' + APP_NAME + '. Tap to set up your login:', url: inviteLink(id) }).catch(() => {}); return; }
   else if (a === 'cancelinvite') return run(async () => { await api.cancelInvite(id); await api.loadData(); }, 'Invite cancelled.');
