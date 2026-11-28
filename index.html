@@ -30,7 +30,7 @@
 <script>
 /* Signed-in users, invite links, email links and the demo skip the landing page and open the app directly. */
 (function(){var s=null;try{s=localStorage.getItem('subapp_session_v1')}catch(e){}
-if(s||/[?&](app|join|demo|screen)=/.test(location.search)||/access_token=|error_description=/.test(location.hash))document.documentElement.className+=' skip-landing';})();
+if(s||/[?&](app|join|demo|screen|paid)=/.test(location.search)||/access_token=|error_description=/.test(location.hash))document.documentElement.className+=' skip-landing';})();
 </script>
 <style>
 /* Graphite and galvanized greys with one accent: the blue of a snapped chalk line. */
@@ -185,6 +185,16 @@ table.lines tbody tr:nth-child(even){background:#f1f3f5}
 .logodrop{display:grid;place-items:center;height:150px;margin:16px 0 4px;border-radius:18px;background:var(--mist)}
 .logodrop img{max-width:70%;max-height:110px;object-fit:contain}
 .acctlogo{width:44px;height:44px;border-radius:12px;object-fit:contain;background:var(--mist);flex:none}
+.trial{background:var(--chalk-soft);box-shadow:none;color:#143a8f}.trial .mut{color:#2c4f9e}.trial svg{flex:none}
+.trial.warn{background:var(--bad-soft);color:#7d1f19}.trial.warn .mut{color:#8f2a23}
+.plan{margin:16px 0 4px;padding:16px;border-radius:16px;background:var(--mist)}
+.card .plan{margin-top:0}
+.planprice{display:flex;align-items:baseline;gap:8px}
+.planprice b{font:700 46px/1 var(--disp);letter-spacing:-.02em}
+.planprice span{font:600 18px/1 var(--disp);color:var(--steel)}
+.plan ul{margin:12px 0 0;padding:0;list-style:none}
+.plan li{position:relative;padding:5px 0 5px 24px;font-size:15px}
+.plan li::before{content:"";position:absolute;left:3px;top:11px;width:10px;height:5px;border-left:2px solid var(--chalk);border-bottom:2px solid var(--chalk);transform:rotate(-45deg)}
 .waiting{background:var(--warn-soft);box-shadow:none;color:#5c3b05}.waiting .mut{color:#7a5310}.waiting svg{flex:none}
 .linkbox{margin-top:12px;padding:11px 12px;border-radius:12px;background:var(--mist);font-size:14px;word-break:break-all;-webkit-user-select:all;user-select:all}
 a.btn{text-decoration:none}
@@ -251,6 +261,19 @@ html:not(.skip-landing) #app{display:none}
 .lp-steps li::before{content:counter(s);display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--ink);color:#fff;font:700 20px/1 var(--disp);margin-bottom:14px}
 .lp-steps h3{font:600 22px/1.2 var(--disp);margin:0 0 6px}
 .lp-steps p{margin:0;color:var(--ink2);line-height:1.55}
+.lp-price{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:0;border-radius:22px;overflow:hidden;box-shadow:0 0 0 1px var(--line)}
+.lp-pl{background:var(--ink) repeating-linear-gradient(180deg,rgba(255,255,255,0) 0 27px,rgba(255,255,255,.055) 27px 28px);color:#fff;padding:34px 30px}
+.lp-amt{display:flex;align-items:baseline;gap:10px}
+.lp-amt b{font:700 clamp(72px,11vw,104px)/.9 var(--disp);letter-spacing:-.03em}
+.lp-amt span{font:600 22px/1 var(--disp);color:#c3cad3}
+.lp-pl p{margin:16px 0 24px;color:#c3cad3;font-size:17px;max-width:26ch}
+.lp-pl .lp-sub{margin-top:14px}
+.lp-pr{padding:34px 30px;background:var(--paper)}
+.lp-pr h3{font:600 23px/1.2 var(--disp);margin:0 0 12px}
+.lp-pr ul{margin:0;padding:0;list-style:none}
+.lp-pr li{position:relative;padding:9px 0 9px 28px;font-size:16px;color:var(--ink2);border-top:1px solid var(--line)}
+.lp-pr li:first-child{border-top:0}
+.lp-pr li::before{content:"";position:absolute;left:3px;top:17px;width:11px;height:6px;border-left:2px solid var(--chalk);border-bottom:2px solid var(--chalk);transform:rotate(-45deg)}
 .lp-end{background:var(--ink);color:#fff;text-align:left}
 .lp-end h2{color:#fff}
 .lp-end p{color:#c3cad3;font-size:18px;max-width:46ch;margin:0 0 26px}
@@ -262,7 +285,7 @@ html:not(.skip-landing) #app{display:none}
 @media (max-width:820px){
   .lp-hero{flex-direction:column;align-items:stretch;gap:8px}.lp-hero>div:first-child{padding-bottom:28px}
   .lp-phone{flex:none;width:min(310px,86%);margin:0 auto}.lp-screen{height:330px}
-  .lp-feats,.lp-steps ol{grid-template-columns:1fr}.lp-sec{padding:52px 0}
+  .lp-feats,.lp-steps ol,.lp-price{grid-template-columns:1fr}.lp-sec{padding:52px 0}
   .lp-nav a.in{display:none}
 }
 @media print{#landing{display:none}}
@@ -276,6 +299,7 @@ html:not(.skip-landing) #app{display:none}
   <div class="lp-wrap">
     <div class="lp-nav" role="navigation" aria-label="Subbit">
       <a class="lp-logo" href="./"><svg viewBox="0 0 96 96" width="38" height="38" aria-hidden="true"><path d="M57 69H22" fill="none" stroke="#4d83ff" stroke-width="12" stroke-linecap="round"/><path d="M70 27H39a10.5 10.5 0 0 0 0 21h18a10.5 10.5 0 0 1 0 21" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></svg>Subbit</a>
+      <a class="in" href="#pricing">Pricing</a>
       <a class="in" href="?app=signin">Sign in</a>
       <a class="lp-cta" href="?app=signup">Create account</a>
     </div>
@@ -284,7 +308,7 @@ html:not(.skip-landing) #app{display:none}
         <h1>The job app for subcontractors.</h1>
         <p>Every contractor you work for gets one card. Their jobs, your price list and your invoices all live on it.</p>
         <a class="lp-cta" href="?app=signup">Create your account</a>
-        <span class="lp-sub">Works on your phone and your computer. Nothing to install.</span>
+        <span class="lp-sub">Free for 3 days, then $75 a month for your whole company. Works on your phone and your computer.</span>
       </div>
       <div class="lp-phone" aria-hidden="true">
         <div class="lp-screen">
@@ -329,6 +353,29 @@ html:not(.skip-landing) #app{display:none}
   </ol>
 </div></section>
 
+<section class="lp-sec" id="pricing"><div class="lp-wrap">
+  <h2>One price for the whole company.</h2>
+  <p class="lp-lead">No per-user fees and no tiers. Put your whole crew on it.</p>
+  <div class="lp-price">
+    <div class="lp-pl">
+      <div class="lp-amt"><b>$75</b><span>a month</span></div>
+      <p>Try everything free for 3 days. You do not need a card to start.</p>
+      <a class="lp-cta" href="?app=signup">Start your free trial</a>
+      <span class="lp-sub">Cancel anytime.</span>
+    </div>
+    <div class="lp-pr">
+      <h3>Everything is included</h3>
+      <ul>
+        <li>Logins for everyone on your crew</li>
+        <li>Unlimited contractors, work orders and invoices</li>
+        <li>A price list for each contractor</li>
+        <li>Job request links your contractors can send jobs through</li>
+        <li>Export for QuickBooks, Xero or a spreadsheet</li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+
 <section class="lp-sec lp-end"><div class="lp-wrap">
   <h2>Stop rebuilding the same invoice.</h2>
   <p>Set up your company and your first contractor today. Questions first? Email <a href="mailto:support@subbitcrm.com" style="color:#fff">support@subbitcrm.com</a>.</p>
@@ -336,7 +383,7 @@ html:not(.skip-landing) #app{display:none}
 </div></section>
 </div>
 
-<footer class="lp-foot"><div class="lp-wrap"><span>© 2026 Sola Scriptura LLC</span><span class="lp-links"><a href="mailto:support@subbitcrm.com">support@subbitcrm.com</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="?app=signin">Sign in</a></span></div></footer>
+<footer class="lp-foot"><div class="lp-wrap"><span>© 2026 Sola Scriptura LLC</span><span class="lp-links"><a href="mailto:support@subbitcrm.com">support@subbitcrm.com</a><a href="#pricing">Pricing</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="?app=signin">Sign in</a></span></div></footer>
 </div>
 <div id="app"></div>
 <script>
@@ -354,6 +401,14 @@ html:not(.skip-landing) #app{display:none}
    ===================================================================== */
 const APP_NAME = 'Subbit';
 const SUPPORT_EMAIL = 'support@subbitcrm.com';
+/* ---- subscription settings ----
+   One plan for the whole company. The price and trial length shown in the app come from here; the trial length that
+   actually applies is the trial_ends_at default in the setup SQL, and the amount charged is whatever the Stripe link charges.
+   Paste the Stripe Payment Link URLs below when they exist. Leave the yearly one empty to offer monthly only. */
+const PRICE_MONTHLY = 75, PRICE_YEARLY = 750, TRIAL_DAYS = 3;
+const STRIPE_LINK_MONTHLY = '';
+const STRIPE_LINK_YEARLY = '';
+const STRIPE_PORTAL_URL = '';             // Stripe customer portal login link: where a customer updates a card or cancels
 const SB_URL   = 'https://uirtgwirsaddtolzahjx.supabase.co';
 const SB_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpcnRnd2lyc2FkZHRvbHphaGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU2MzY5MDcsImV4cCI6MjExMTIxMjkwN30.JaLclDcIKkuzdtSpI8sBRmnx5nSbP_tuem2lUfj8XH4'; // anon (public) key
 const PHOTO_BUCKET = 'wo-photos';
@@ -373,7 +428,7 @@ const NOW = new Date();
 const S = { view: 'loading', contractorInvite: null, joinCode: '', invite: null, setupStep: 1, authMode: 'signin', tab: 'contractors', stack: [], draft: null, cview: 'jobs', saved: [],
   filter: 'open', search: '', detailId: null, edit: null,
   cal: { y: NOW.getFullYear(), m: NOW.getMonth() }, calDay: null, calMode: 'month', weekStart: null,
-  session: null, profile: null, company: null, orders: [], pays: [], contractors: [], team: [], invites: [],
+  session: null, profile: null, company: null, billing: null, justPaid: false, orders: [], pays: [], contractors: [], team: [], invites: [],
   msg: null, busy: false, form: null };
 
 /* ---------- helpers ---------- */
@@ -452,6 +507,7 @@ const ERR = {
   work_order_not_complete: 'Mark the work order complete before billing.',
   already_submitted: 'An invoice was already sent for this work order.',
   requester_required: 'Enter a name.',
+  subscription_required: 'Your company needs an active subscription to keep using Subbit.',
   contractor_has_jobs: 'This contractor has jobs, so the card cannot be deleted.',
   move_conflict: 'Those jobs could not be moved to that contractor. Pick a different one, or keep the jobs with no contractor.',
   not_found_or_linked: 'Payment status on a linked work order is set by the contractor.',
@@ -541,6 +597,9 @@ const live = {
     S.orders = o || []; S.pays = p || []; S.contractors = c || []; S.team = t || [];
     S.invites = (i || []).filter(x => new Date(x.expires_at) > new Date());
   },
+  async loadBilling() {                 // null (older database, or a hiccup) never locks anyone out
+    try { S.billing = await sb.rpc('billing_state'); } catch (e) { if (e.code === 'not_authenticated') throw e; S.billing = null; }
+  },
   createCompany: (name, display) => sb.rpc('signup_create_company', { p_company_name: name, p_display_name: display }),
   joinTeam: (code, display) => sb.rpc('team_join', { p_code: code, p_display_name: display }),
   async peekInvite(code) {             // no login needed: asks who the invite is from
@@ -624,6 +683,7 @@ const demoDb = {
   ],
   team: [{ id: 'demo', role: 'owner', display_name: 'Demo User', email: 'you@example.com' }, { id: 'm-2', role: 'laborer', display_name: 'Sample Crew', email: 'crew@example.com' }],
   invites: [],
+  billing: { ok: true, enforced: true, access: true, exempt: false, status: 'trialing', trial_ends_at: new Date(Date.now() + 2.5 * 864e5).toISOString(), current_period_end: null, plan: null, has_customer: false },
   user: null
 };
 const wait = () => new Promise(r => setTimeout(r, 120));
@@ -640,6 +700,7 @@ const demo = {
     if (!isMgmt()) { S.orders = demoDb.orders.filter(o => o.status === 'accepted' || o.status === 'complete').map(o => { const c = { ...o, contractor_name: (demoDb.contractors.find(x => x.id === o.contractor_id) || {}).name }; delete c.pay_amount; return c; }); S.pays = []; S.contractors = []; S.invites = []; S.saved = []; return; }
     S.orders = demoDb.orders.map(o => ({ ...o })); S.pays = demoDb.pays.map(p => ({ ...p })); S.contractors = demoDb.contractors.map(c => ({ ...c })).sort((a, b) => a.name.localeCompare(b.name)); S.saved = demoDb.saved.map(i => ({ ...i })).sort((a, b) => a.title.localeCompare(b.title));
   },
+  async loadBilling() { S.billing = Object.assign({}, demoDb.billing); },
   async createCompany(name, display) { if (!name) throw appErr('company_name_required'); demoDb.user = { company: name, name: display, role: 'owner' }; },
   async peekInvite(code) { await wait(); return { ok: true, company_name: 'Demo Subcontracting LLC', role: (demoDb.invites.find(i => i.code === code) || {}).role || 'laborer' }; },
   async joinTeam(code, display) { await wait(); if (!code) throw appErr('invalid_team_code'); demoDb.user = { company: 'Demo Subcontracting LLC', name: display || 'Crew Member', role: 'laborer', setup_done: true }; },
@@ -672,6 +733,11 @@ const api = DEMO ? demo : live;
 const role = () => S.profile && S.profile.role;
 const isMgmt = () => MGMT_ROLES.includes(role());
 const canBill = () => BILLING_ROLES.includes(role());
+const billingOn = () => !!(S.billing && S.billing.enforced && !S.billing.exempt);
+const locked = () => !!(S.billing && S.billing.enforced && S.billing.access === false);
+const daysUntil = iso => iso ? Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 864e5)) : null;
+const longDate = iso => iso ? new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+const payLink = base => base + (base.indexOf('?') < 0 ? '?' : '&') + 'client_reference_id=' + encodeURIComponent(S.profile.company_id);
 const payFor = id => S.pays.find(p => p.work_order_id === id) || null;
 const contractor = id => S.contractors.find(c => c.id === id) || null;
 const gcName = o => { const c = contractor(o.contractor_id); return c ? c.name : (o.contractor_name || ''); };
@@ -770,6 +836,53 @@ function viewOnboard() {                  // signed in, not in a company, and wa
   const p = S.form || {};
   return shell('<div class="brandsub">Signed in as ' + esc(S.session.user.email) + '</div>', '<h1 class="sheeth">' + (S.invite ? 'Join ' + esc(S.invite.company_name) : 'Join your company') + '</h1><form data-form="join">' + field('jc', 'code', 'Invite code', p.code || S.joinCode, 'required autocapitalize="characters" autocomplete="off"') + field('dn2', 'display', 'Your name', p.display, 'required') + '<button class="btn"' + dis() + '>Join</button></form>' +
     '<div class="links"><button class="link" data-act="tosetup">Start a new company instead</button><button class="link" data-act="signout">Sign out</button></div>');
+}
+/* ---------- subscription screens ---------- */
+function planBox() {
+  return '<div class="plan"><div class="planprice"><b>$' + PRICE_MONTHLY + '</b><span>a month</span></div><div class="mut">One price for your whole company.</div>' +
+    '<ul><li>Everyone on your crew, no per-user fee</li><li>Unlimited contractors, work orders and invoices</li><li>Cancel anytime</li></ul></div>';
+}
+function subscribeButtons() {
+  if (!STRIPE_LINK_MONTHLY) return '<div class="msg note">Online sign-up for subscriptions is not open yet. Email <a href="mailto:' + SUPPORT_EMAIL + '">' + SUPPORT_EMAIL + '</a> and we will set you up.</div>';
+  return '<a class="btn" href="' + esc(payLink(STRIPE_LINK_MONTHLY)) + '">Subscribe for $' + PRICE_MONTHLY + ' a month</a>' +
+    (STRIPE_LINK_YEARLY ? '<a class="btn ghost" href="' + esc(payLink(STRIPE_LINK_YEARLY)) + '">Pay yearly: $' + PRICE_YEARLY + ' (2 months free)</a>' : '') +
+    '<p class="mut" style="margin:10px 0 0">You pay on a secure Stripe page, then come straight back here.</p>';
+}
+function billingLine() {                  // one sentence on where the subscription stands
+  const b = S.billing || {}, d = daysUntil(b.trial_ends_at);
+  if (!b.ok && !b.status) return '';
+  if (b.exempt) return 'No charge on this account.';
+  if (b.status === 'active') return 'Active' + (b.plan === 'year' ? ', paid yearly' : '') + (b.current_period_end ? '. Renews ' + longDate(b.current_period_end) + '.' : '.');
+  if (b.status === 'past_due') return 'The last payment did not go through. Update your card to keep your access.';
+  if (b.status === 'canceled') return b.access ? 'Cancelled. You keep access until ' + longDate(b.current_period_end) + '.' : 'Cancelled.';
+  if (!b.enforced) return 'Free during early release. Paid plans are coming: $' + PRICE_MONTHLY + ' a month for your whole company.';
+  return b.access ? 'Free trial: ' + (d <= 1 ? 'ends ' + (d === 0 ? 'today' : 'tomorrow') : d + ' days left') + '. It ends ' + longDate(b.trial_ends_at) + '.' : 'Your free trial has ended.';
+}
+function viewPaywall() {                  // trial or subscription over: nothing else in the app opens until the owner subscribes
+  const b = S.billing || {}, owner = role() === 'owner', co = (S.company && S.company.name) || 'your company';
+  const head = b.status === 'canceled' ? 'Your subscription has ended' : b.status === 'trialing' ? 'Your free trial has ended' : 'Subscribe to keep going';
+  return shell('<div class="brandsub">' + esc(co) + '</div>', '<h1 class="sheeth">' + head + '</h1>' +
+    '<p class="mut">Your contractors, jobs and invoices are saved. ' + (owner ? 'Subscribe to pick up where you left off.' : 'Ask the owner of ' + esc(co) + ' to subscribe, then tap the button below.') + '</p>' +
+    planBox() + (owner ? subscribeButtons() : '') +
+    '<button class="btn ghost" data-act="recheck"' + dis() + '>' + (owner ? 'I already paid. Check again' : 'Check again') + '</button>' +
+    '<div class="links"><a class="link" href="mailto:' + SUPPORT_EMAIL + '">Contact support</a><button class="link" data-act="signout">Sign out</button></div>');
+}
+function viewPlan() {                     // Account > Subscription
+  const b = S.billing || {}, owner = role() === 'owner';
+  const canSub = owner && b.enforced && !b.exempt && (b.status === 'trialing' || (b.status === 'canceled'));
+  return msgHtml() + '<div class="card"><div class="title">' + esc((S.company && S.company.name) || 'Your company') + '</div><p class="mut" style="margin:4px 0 0">' + esc(billingLine()) + '</p></div>' +
+    '<div class="card">' + planBox() + (canSub ? subscribeButtons() : '') +
+    (owner && b.has_customer && STRIPE_PORTAL_URL ? '<a class="btn ghost" href="' + esc(STRIPE_PORTAL_URL) + '" target="_blank" rel="noopener">Update card, see receipts or cancel</a><p class="mut" style="margin:10px 0 0">Sign in there with the email you paid with.</p>' : '') +
+    (owner ? '' : '<p class="mut" style="margin:12px 0 0">Only the company owner can change the subscription.</p>') + '</div>' +
+    '<p class="mut" style="margin:0 2px">Questions about billing? Email <a href="mailto:' + SUPPORT_EMAIL + '">' + SUPPORT_EMAIL + '</a>.</p>';
+}
+function trialBanner() {                  // shown to people who can act on it while the trial runs
+  const b = S.billing || {};
+  if (!billingOn() || !canBill()) return '';
+  if (b.status === 'past_due') return '<button class="card trial warn" data-act="openplan"><div class="row" style="align-items:center"><div><div class="title">Payment did not go through</div><div class="mut">Update your card to keep your access.</div></div>' + ICON.chev + '</div></button>';
+  if (b.status !== 'trialing' || !b.access) return '';
+  const d = daysUntil(b.trial_ends_at);
+  return '<button class="card trial" data-act="openplan"><div class="row" style="align-items:center"><div><div class="title">Free trial: ' + (d <= 1 ? 'ends ' + (d === 0 ? 'today' : 'tomorrow') : d + ' days left') + '</div><div class="mut">$' + PRICE_MONTHLY + ' a month for your whole company after that.</div></div>' + ICON.chev + '</div></button>';
 }
 // first-time setup: company name, logo, contact details, done
 function viewSetup() {
@@ -1048,6 +1161,7 @@ function viewAccount() {
       : '<div class="title">' + esc(co.name || 'Your company') + '</div>') +
     field('an', 'display', 'Your name', S.profile.display_name, 'required') +
     '<div class="mut" style="margin-top:8px">' + esc(S.session.user.email) + ' · ' + esc(ROLE_LABEL[role()] || role()) + '</div><button class="btn ghost"' + dis() + '>Save</button></form>' + team +
+    (isMgmt() && billingLine() ? '<h2>Subscription</h2><button class="card" data-act="openplan"><div class="row" style="align-items:center"><div><div class="title">$' + PRICE_MONTHLY + ' a month, whole company</div><div class="mut">' + esc(billingLine()) + '</div></div>' + ICON.chev + '</div></button>' : '') +
     '<h2>Help</h2><div class="card"><div class="title">Questions or a problem?</div><p class="mut" style="margin:4px 0 0">Email <a href="mailto:' + SUPPORT_EMAIL + '">' + SUPPORT_EMAIL + '</a> and we will get back to you.</p><p class="mut" style="margin:10px 0 0"><a href="terms.html" target="_blank" rel="noopener">Terms</a> · <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a></p></div>' +
     '<button class="btn ghost" data-act="signout">Sign out</button>';
 }
@@ -1081,6 +1195,7 @@ function render() {
   else if (S.view === 'auth') h = viewAuth();
   else if (S.view === 'onboard') h = viewOnboard();
   else if (S.view === 'setup') h = viewSetup();
+  else if (S.view === 'paywall') h = viewPaywall();
   else {
     const tabs = TABS(); if (!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
     const e = S.edit, o = S.detailId ? S.orders.find(x => String(x.id) === String(S.detailId)) : null, sub = e || o;
@@ -1089,11 +1204,12 @@ function render() {
     else if (e && e.kind === 'contractor') { title = e.id ? 'Contractor' : 'Add contractor'; body = viewContractor(); }
     else if (e && e.kind === 'cinvite') { title = 'Invite a contractor'; body = viewContractorInvite(); }
     else if (e && e.kind === 'export') { title = 'Export invoices'; body = viewExport(); }
+    else if (e && e.kind === 'plan') { title = 'Subscription'; body = viewPlan(); }
     else if (e && e.kind === 'saved') { title = e.id ? 'Saved item' : 'New saved item'; body = viewSavedForm(); }
     else if (e && e.kind === 'invoice' && o) { title = e.mode === 'edit' ? 'Invoice' : 'Invoice ' + ((payFor(o.id) || {}).invoice_number || ''); body = e.mode === 'edit' ? viewInvoiceEdit(o) : viewInvoice(o); }
     else if (o) { title = isMgmt() ? 'Work order' : 'Job'; body = viewDetail(o); }
     else { title = tabs.find(t => t[0] === S.tab)[2]; body = S.tab === 'orders' ? viewOrders() : S.tab === 'schedule' ? viewSchedule() : S.tab === 'billing' ? viewBilling() : S.tab === 'contractors' ? viewContractors() : viewAccount(); }
-    h = demoBar() + '<header>' + (sub ? '<button class="hbtn" data-act="back" aria-label="Back">' + ICON.back + '</button>' : '') + '<h1>' + esc(title) + '</h1>' + (sub ? '' : '<button class="hbtn" data-act="reload" aria-label="Refresh">' + ICON.refresh + '</button>') + busyBar() + '</header><main>' + body + '</main>' +
+    h = demoBar() + '<header>' + (sub ? '<button class="hbtn" data-act="back" aria-label="Back">' + ICON.back + '</button>' : '') + '<h1>' + esc(title) + '</h1>' + (sub ? '' : '<button class="hbtn" data-act="reload" aria-label="Refresh">' + ICON.refresh + '</button>') + busyBar() + '</header><main>' + (sub ? '' : trialBanner()) + body + '</main>' +
       '<nav aria-label="Sections"><div class="navbrand">' + LOGO('#16191d', '#1f5ae0', 34) + esc(APP_NAME) + '</div><div class="tabs">' + tabs.map(t => '<button data-act="tab" data-id="' + t[0] + '" class="' + (!sub && S.tab === t[0] ? 'on' : '') + '"' + (!sub && S.tab === t[0] ? ' aria-current="page"' : '') + '>' + t[1] + '<span>' + t[2] + '</span></button>').join('') + '</div></nav>';
   }
   $app.className = S.view === 'app' ? 'inapp' : '';
@@ -1133,7 +1249,20 @@ async function enter() {                 // after a session exists: profile -> f
   }
   if (S.joinCode) { flash('note', 'You are already part of ' + ((S.company && S.company.name) || 'a company') + ', so that invite was not used. Sign out first to join a different company.'); S.joinCode = ''; S.invite = null; }
   if (role() === 'owner' && S.company && !S.company.setup_done) { S.setupStep = 2; S.view = 'setup'; return; }   // first login
+  await api.loadBilling();
+  if (S.justPaid) {                       // back from the Stripe page: the payment can take a few seconds to register
+    S.justPaid = false;
+    for (let i = 0; i < 6 && S.billing && S.billing.status !== 'active'; i++) { await new Promise(r => setTimeout(r, 2000)); await api.loadBilling(); }
+    if (S.billing && S.billing.status === 'active') flash('good', 'You are subscribed. Thank you.');
+    else flash('note', 'Thanks. Your payment can take a minute to show up here. Tap "Check again" if this screen does not update.');
+  }
+  if (locked()) { S.view = 'paywall'; return; }
   await openApp();
+}
+async function reloadAll() {              // the Refresh button: data, and whether the subscription still stands
+  await api.loadBilling();
+  if (locked()) { S.view = 'paywall'; S.stack = []; S.edit = null; S.detailId = null; return; }
+  await api.loadData();
 }
 async function openApp() { await api.loadData(); S.view = 'app'; S.tab = TABS()[0][0]; S.stack = []; S.edit = null; S.detailId = null; }
 async function run(fn, okText) {         // one place for busy state + error display
@@ -1303,8 +1432,10 @@ document.addEventListener('click', ev => {
   else if (a === 'markpay') return run(async () => { await api.markPay(S.detailId, id); await api.loadData(); }, id === 'paid' ? 'Marked paid.' : 'Marked approved.');
   else if (a === 'linkcode') return run(async () => { await api.createLinkCode(S.edit.id); await api.loadData(); }, 'Link code created.');
   else if (a === 'unlink') return run(async () => { await api.revokeLink(S.edit.id); await api.loadData(); }, 'Unlinked. The old code or connection no longer works.');
-  else if (a === 'reload') return run(() => api.loadData());
-  else if (a === 'signout') { api.signOut(); Object.assign(S, { view: 'auth', authMode: 'signin', detailId: null, edit: null, draft: null, stack: [], msg: null, profile: null, search: '', filter: 'open', calDay: null, form: null }); }
+  else if (a === 'reload') return run(() => reloadAll());
+  else if (a === 'openplan') { go({ kind: 'plan' }); return run(() => api.loadBilling()); }
+  else if (a === 'recheck') return run(async () => { await api.loadBilling(); if (locked()) flash('note', 'No active subscription yet. If you just paid, give it a minute and try again.'); else await openApp(); });
+  else if (a === 'signout') { api.signOut(); Object.assign(S, { view: 'auth', authMode: 'signin', detailId: null, edit: null, draft: null, stack: [], msg: null, profile: null, billing: null, search: '', filter: 'open', calDay: null, form: null }); }
   render();
 });
 
@@ -1312,6 +1443,7 @@ document.addEventListener('click', ev => {
   if (document.documentElement.classList.contains('skip-landing')) document.title = APP_NAME;   // the landing page keeps its own title
   render();
   const qs = new URLSearchParams(location.search), want = qs.get('app');
+  if (qs.get('paid')) { S.justPaid = true; qs.delete('paid'); if (!want) history.replaceState(null, '', location.pathname + (qs.toString() ? '?' + qs.toString() : '') + location.hash); }
   if (want) { qs.delete('app'); history.replaceState(null, '', location.pathname + (qs.toString() ? '?' + qs.toString() : '') + location.hash); if (want === 'signup' || want === 'join') S.authMode = want; }
   const jc = (qs.get('join') || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
   if (jc) {                               // opened from an invite link
@@ -1336,6 +1468,7 @@ document.addEventListener('click', ev => {
       catch (e) { if (e.code === 'not_authenticated') saveSession(null); else { S.view = 'auth'; flash('err', errText(e)); render(); return; } }
     }
   } else if (/[?&]screen=confirmed\b/.test(location.search)) { S.session = { user: { id: 'demo', email: 'you@example.com' } }; S.view = 'auth'; S.authMode = 'confirmed'; render(); return; }
+  else if (/[?&]screen=paywall\b/.test(location.search)) { await api.signIn(); await api.loadProfile(); demoDb.billing = Object.assign({}, demoDb.billing, { access: false, trial_ends_at: new Date(Date.now() - 864e5).toISOString() }); await api.loadBilling(); S.view = 'paywall'; render(); return; }
   else if (/[?&]screen=setup\b/.test(location.search)) { S.session = { user: { id: 'demo', email: 'you@example.com' } }; S.form = {}; S.setupStep = 1; S.view = 'setup'; render(); return; }
   S.view = 'auth'; render();
 })();
